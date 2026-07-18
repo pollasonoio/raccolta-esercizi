@@ -4,10 +4,10 @@
 <meta charset="UTF-8">
 <title>Raccolta Esercizi</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#0f6a37">
 <link rel="manifest" href="manifest.json">
-<link rel="icon" href="icon-192.png">
+<meta name="theme-color" content="#0f6a37">
 <link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
 <style>
   :root{
     --accent:#0f6a37;
@@ -286,6 +286,71 @@
   .drawer-foot-row{display:flex; gap:8px;}
   .save-status{font-size:12px; color:var(--accent-dark); min-height:16px; font-weight:600; text-align:center;}
 
+  /* ---------- LIBRERIA SCHEDE ---------- */
+  .lib-overlay{
+    position:fixed; inset:0; background:rgba(20,25,30,.55);
+    display:none; align-items:center; justify-content:center; z-index:110; padding:24px;
+  }
+  .lib-overlay.open{display:flex;}
+  .lib-modal{
+    background:#fff; border-radius:14px; max-width:820px; width:100%;
+    max-height:86vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,.3);
+    display:flex; flex-direction:column;
+  }
+  .lib-head{
+    padding:16px 22px; border-bottom:1px solid var(--border);
+    display:flex; align-items:center; justify-content:space-between; flex-shrink:0;
+  }
+  .lib-head h3{margin:0; font-size:17px;}
+  .lib-body{padding:14px 22px 22px; overflow-y:auto;}
+  .lib-empty{color:var(--text-muted); font-size:13.5px; text-align:center; padding:50px 10px;}
+  .lib-card{
+    border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin-bottom:10px;
+    display:flex; align-items:center; gap:14px;
+  }
+  .lib-card .lc-info{flex:1; min-width:0;}
+  .lib-card .lc-name{font-weight:700; font-size:14.5px; margin-bottom:2px;}
+  .lib-card .lc-meta{font-size:12px; color:var(--text-muted);}
+  .lib-card .lc-actions{display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;}
+  .lib-card .lc-actions .btn{padding:6px 10px; font-size:12px;}
+  .lib-card .lc-actions .btn svg{width:13px;height:13px;}
+
+  /* ---------- CONDIVIDI LINK ---------- */
+  .share-overlay{
+    position:fixed; inset:0; background:rgba(20,25,30,.55);
+    display:none; align-items:center; justify-content:center; z-index:120; padding:24px;
+  }
+  .share-overlay.open{display:flex;}
+  .share-modal{
+    background:#fff; border-radius:14px; max-width:520px; width:100%;
+    box-shadow:0 20px 60px rgba(0,0,0,.3); padding:22px 24px;
+  }
+  .share-modal h3{margin:0 0 6px; font-size:16px;}
+  .share-modal p{margin:0 0 14px; font-size:13px; color:var(--text-muted); line-height:1.5;}
+  .share-link-box{
+    display:flex; gap:8px; margin-bottom:14px;
+  }
+  .share-link-box input{
+    flex:1; padding:9px 10px; border:1px solid var(--border); border-radius:8px; font-size:12.5px;
+    background:var(--bg); color:var(--text); font-family:monospace;
+  }
+  .share-modal .modal-actions{display:flex; gap:10px; justify-content:flex-end;}
+  .offline-badge{
+    display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:700;
+    padding:3px 9px; border-radius:999px; margin-left:2px;
+  }
+  .offline-badge.online{background:var(--accent-light); color:var(--accent-dark);}
+  .offline-badge.offline{background:#fde8e6; color:#b42318;}
+  .import-banner{
+    position:fixed; top:0; left:0; right:0; background:var(--accent-dark); color:#fff;
+    padding:12px 18px; display:none; align-items:center; justify-content:space-between;
+    z-index:200; gap:14px; box-shadow:0 2px 10px rgba(0,0,0,.2);
+  }
+  .import-banner.open{display:flex;}
+  .import-banner .ib-text{font-size:13.5px; font-weight:600;}
+  .import-banner .ib-actions{display:flex; gap:8px; flex-shrink:0;}
+  .import-banner .btn{padding:7px 12px; font-size:12.5px;}
+
   /* ---------- CONTENUTO SCHEDA (usato sia nell'anteprima a schermo che in stampa) ---------- */
   .print-head{border-bottom:2px solid var(--accent); padding-bottom:10px; margin-bottom:16px;}
   .print-head h1{font-size:19px; margin:0 0 6px; color:var(--accent-dark);}
@@ -295,11 +360,19 @@
     display:flex; gap:14px; padding:12px 0; border-bottom:1px solid #ddd;
     break-inside:avoid;
   }
-  .print-item img{max-width:110px; max-height:110px; width:auto; height:auto; border-radius:6px; flex-shrink:0; display:block; align-self:flex-start;}
+  .print-item .pi-thumb{
+    width:110px; height:110px; flex:0 0 110px; display:flex;
+    align-items:center; justify-content:center; overflow:hidden; border-radius:6px;
+  }
+  .print-item .pi-thumb img{width:100%; height:100%; object-fit:contain; display:block;}
+  .print-item .pi-text{flex:1; min-width:0;}
   .print-item h4{margin:0 0 4px; font-size:14px;}
   .print-item .pq{font-size:12px; font-weight:700; color:var(--accent-dark); margin-bottom:3px;}
   .print-item p{margin:0; font-size:12px; color:#333; line-height:1.4;}
   .print-item .pnotes{margin-top:6px; font-size:11.5px; color:#888; border-top:1px dashed #ccc; padding-top:4px;}
+  .a4-page-number{
+    text-align:center; font-size:10.5px; color:#888; margin-top:0.3cm; flex-shrink:0;
+  }
 
   /* ---------- FOGLI A4 (usati sia nell'anteprima a schermo, sia in stampa,
      sia nel file HTML che si scarica) ----------
@@ -379,6 +452,14 @@
 <!-- FOGLI DI STAMPA: generati da JS (buildA4Sheets), visibili solo in stampa. -->
 <div id="printPages"></div>
 
+<div class="import-banner" id="importBanner">
+  <div class="ib-text" id="importBannerText"></div>
+  <div class="ib-actions">
+    <button class="btn" id="importBannerDismiss" style="background:transparent;border-color:rgba(255,255,255,.5);color:#fff;">Chiudi</button>
+    <button class="btn primary" id="importBannerAccept" style="background:#fff;color:var(--accent-dark);border-color:#fff;">Modifica questa scheda</button>
+  </div>
+</div>
+
 <header>
   <h1>Raccolta Esercizi</h1>
   <div class="search-wrap">
@@ -386,6 +467,11 @@
     <input id="searchInput" type="text" placeholder="Cerca esercizio per nome o descrizione...">
   </div>
   <div class="header-spacer"></div>
+  <span class="offline-badge online" id="connBadge" title="Stato connessione">In linea</span>
+  <button class="btn" id="openLibraryBtn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v13h18V7"/><path d="M3 7l2-4h14l2 4"/><path d="M3 7h18"/></svg>
+    Le mie schede
+  </button>
   <button class="btn primary" id="openSchedaBtn">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4"/><path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9c1.5 0 2.91.37 4.15 1.02"/><path d="M22 4l-9 9"/></svg>
     Scheda <span class="badge-count" id="schedaCount">0</span>
@@ -468,14 +554,15 @@
   <div class="drawer-foot drawer-foot-col">
     <div class="drawer-foot-row">
       <button class="btn" id="previewSchedaBtn">Anteprima</button>
-      <button class="btn" id="saveSchedaBtn">Salva scheda</button>
+      <button class="btn primary" id="saveToLibraryBtn">Salva nella libreria</button>
     </div>
     <div class="drawer-foot-row">
       <button class="btn" id="shareLinkBtn">Condividi link</button>
-      <button class="btn primary" id="printSchedaBtn">Stampa / Esporta PDF</button>
+      <button class="btn" id="saveSchedaBtn">Esporta file</button>
     </div>
     <div class="drawer-foot-row">
       <button class="btn danger" id="clearSchedaBtn">Svuota</button>
+      <button class="btn primary" id="printSchedaBtn">Stampa / Esporta PDF</button>
     </div>
     <div class="save-status" id="saveStatus"></div>
   </div>
@@ -496,19 +583,35 @@
   </div>
 </div>
 
+<!-- LIBRERIA SCHEDE (schede salvate, riutilizzabili anche offline) -->
+<div class="lib-overlay" id="libraryOverlay">
+  <div class="lib-modal">
+    <div class="lib-head">
+      <h3>Le mie schede</h3>
+      <button class="close-x" id="libraryClose" style="position:static;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="lib-body" id="libraryBody"></div>
+  </div>
+</div>
+
+<!-- CONDIVIDI LINK -->
+<div class="share-overlay" id="shareOverlay">
+  <div class="share-modal">
+    <h3>Condividi scheda via link</h3>
+    <p>Chi apre questo link, sullo stesso sito, vede la scheda con gli esercizi selezionati (nome, quantità, note). Se ha già aperto l'app in precedenza, funziona anche senza connessione.</p>
+    <div class="share-link-box">
+      <input type="text" id="shareLinkInput" readonly>
+      <button class="btn primary" id="shareCopyBtn">Copia</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="shareCloseBtn">Chiudi</button>
+    </div>
+  </div>
+</div>
+
 <script src="data.js"></script>
-<script>
-  // Registra il service worker per il funzionamento offline. Se la pagina
-  // e' aperta da file:// (senza hosting) il browser blocca i service worker:
-  // l'app funziona comunque, semplicemente resta legata a quella cartella.
-  if("serviceWorker" in navigator && (location.protocol==="http:"||location.protocol==="https:")){
-    window.addEventListener("load", function(){
-      navigator.serviceWorker.register("sw.js").catch(function(err){
-        console.warn("Registrazione service worker fallita:", err);
-      });
-    });
-  }
-</script>
 <script>
 (function(){
   "use strict";
@@ -979,8 +1082,8 @@
 
   function buildItemHtml(imgSrc, nome, quantita, descrizione){
     return '<div class="print-item">' +
-      (imgSrc ? '<img src="'+escapeHtml(imgSrc)+'" alt="">' : "") +
-      '<div><h4>'+escapeHtml(nome)+'</h4>' +
+      '<div class="pi-thumb">' + (imgSrc ? '<img src="'+escapeHtml(imgSrc)+'" alt="">' : "") + '</div>' +
+      '<div class="pi-text"><h4>'+escapeHtml(nome)+'</h4>' +
       (quantita ? '<div class="pq">'+escapeHtml(quantita)+'</div>' : "") +
       '<p>'+escapeHtml(descrizione || "")+'</p>' +
       '<div class="pnotes">Note: ______________________________________________</div>' +
@@ -1008,9 +1111,11 @@
     var pageInnerHPx = cmToPx(29.7 - 2*1); // altezza utile: meno margini sopra/sotto (1cm ciascuno)
     var headerHPx = cmToPx(contentWCm * LH_HEADER_RATIO) + cmToPx(0.5);
     var footerHPx = cmToPx(contentWCm * LH_FOOTER_RATIO) + cmToPx(0.5);
-    // piccolo margine di sicurezza (evita che un calcolo leggermente ottimistico
-    // faccia traboccare l'ultimo esercizio fuori dal foglio)
-    var avail = pageInnerHPx - headerHPx - footerHPx - cmToPx(0.4);
+    // margine di sicurezza piu' ampio: evita che piccole differenze tra il
+    // calcolo a schermo e la resa in stampa creino una pagina aggiuntiva
+    // quasi vuota per un trabocco di pochi millimetri
+    var pageNumH = cmToPx(0.6);
+    var avail = pageInnerHPx - headerHPx - footerHPx - pageNumH - cmToPx(0.9);
 
     // "probe" invisibile per misurare l'altezza reale del titolo e di ogni esercizio
     var probe = document.createElement("div");
@@ -1026,7 +1131,7 @@
     }
 
     var titleHtml = buildTitleHtml(paziente, dataVal, note);
-    var titleH = measure(titleHtml);
+    var titleH = items.length ? measure(titleHtml) : 0;
     var itemHtmls = items.map(function(it){ return buildItemHtml(it.imgSrc, it.nome, it.quantita, it.descrizione); });
     var itemHeights = itemHtmls.map(measure);
 
@@ -1047,9 +1152,17 @@
       current.push(i);
       used += h;
     }
-    pages.push({items: current, isFirst: isFirstPage});
+    // aggiunge l'ultima pagina solo se contiene davvero qualcosa (esercizi,
+    // o il titolo alla primissima pagina): evita fogli vuoti in coda
+    if(current.length > 0 || (isFirstPage && items.length === 0)){
+      pages.push({items: current, isFirst: isFirstPage});
+    }
+    if(pages.length === 0){
+      pages.push({items: [], isFirst: true});
+    }
 
-    pages.forEach(function(pg){
+    var totalPages = pages.length;
+    pages.forEach(function(pg, pgIndex){
       var sheet = document.createElement("div");
       sheet.className = "a4-sheet";
 
@@ -1066,6 +1179,13 @@
       pg.items.forEach(function(i){ bodyHtml += itemHtmls[i]; });
       body.innerHTML = bodyHtml;
       sheet.appendChild(body);
+
+      if(totalPages > 1){
+        var pageNum = document.createElement("div");
+        pageNum.className = "a4-page-number";
+        pageNum.textContent = "Pagina " + (pgIndex+1) + " di " + totalPages;
+        sheet.appendChild(pageNum);
+      }
 
       var footerImg = document.createElement("img");
       footerImg.className = "a4-footer";
@@ -1185,13 +1305,13 @@
   // A4 dell'app (buildA4Sheets) incorporandola come script inline: cosi',
   // quando lo si apre, si ricompone da solo in fogli 21x29.7cm -- stesso
   // formato dell'anteprima e della stampa, sia a schermo che stampandolo.
-  async function buildStandaloneSchedaHTML(){
+  async function buildStandaloneSchedaHTML(override){
     var headerSrc = lhHeaderSrc();
     var footerSrc = lhFooterSrc();
-    var paziente = fPaziente.value || "";
-    var dataVal = fData.value || new Date().toLocaleDateString("it-IT");
-    var note = fNote.value || "";
-    var ids = Array.from(state.selected);
+    var paziente = (override && override.paziente !== undefined) ? override.paziente : (fPaziente.value || "");
+    var dataVal = (override && override.dataVal) ? override.dataVal : (fData.value || new Date().toLocaleDateString("it-IT"));
+    var note = (override && override.note !== undefined) ? override.note : (fNote.value || "");
+    var ids = (override && override.ids) ? override.ids : Array.from(state.selected);
 
     var haveImgData = await ensureImgDataLoaded();
     var imgData = getImgData();
@@ -1227,11 +1347,14 @@
       '.print-meta{font-size:13px;color:#333;display:flex;gap:22px;}' +
       '.print-note{margin-top:8px;font-size:12.5px;color:#333;white-space:pre-line;}' +
       '.print-item{display:flex;gap:14px;padding:12px 0;border-bottom:1px solid #ddd;break-inside:avoid;}' +
-      '.print-item img{max-width:110px;max-height:110px;width:auto;height:auto;border-radius:6px;flex-shrink:0;display:block;align-self:flex-start;}' +
+      '.print-item .pi-thumb{width:110px;height:110px;flex:0 0 110px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:6px;}' +
+      '.print-item .pi-thumb img{width:100%;height:100%;object-fit:contain;display:block;}' +
+      '.print-item .pi-text{flex:1;min-width:0;}' +
       '.print-item h4{margin:0 0 4px;font-size:14px;}' +
       '.print-item .pq{font-size:12px;font-weight:700;color:#0a4d28;margin-bottom:3px;}' +
       '.print-item p{margin:0;font-size:12px;color:#333;line-height:1.4;}' +
       '.print-item .pnotes{margin-top:6px;font-size:11.5px;color:#888;border-top:1px dashed #ccc;padding-top:4px;}' +
+      '.a4-page-number{text-align:center;font-size:10.5px;color:#888;margin-top:0.3cm;flex-shrink:0;}' +
       '@page{size:A4;margin:0;}' +
       '@media print{' +
         'body{background:#fff;padding:0;}' +
@@ -1246,7 +1369,7 @@
       'function escapeHtml(s){s=(s==null?"":String(s));var d=document.createElement("div");d.textContent=s;return d.innerHTML;}' +
       'var _cmPx=null;' +
       'function cmToPx(cm){if(_cmPx===null){var p=document.createElement("div");p.style.cssText="position:absolute;visibility:hidden;height:0;width:100cm;";document.body.appendChild(p);_cmPx=p.getBoundingClientRect().width/100;document.body.removeChild(p);if(!_cmPx)_cmPx=37.7952755906;}return cm*_cmPx;}' +
-      'function buildItemHtml(imgSrc,nome,quantita,descrizione){return \'<div class="print-item">\'+(imgSrc?\'<img src="\'+escapeHtml(imgSrc)+\'" alt="">\':"")+\'<div><h4>\'+escapeHtml(nome)+\'</h4>\'+(quantita?\'<div class="pq">\'+escapeHtml(quantita)+\'</div>\':"")+\'<p>\'+escapeHtml(descrizione||"")+\'</p>\'+\'<div class="pnotes">Note: ______________________________________________</div>\'+\'</div></div>\';}' +
+      'function buildItemHtml(imgSrc,nome,quantita,descrizione){return \'<div class="print-item">\'+\'<div class="pi-thumb">\'+(imgSrc?\'<img src="\'+escapeHtml(imgSrc)+\'" alt="">\':"")+\'</div>\'+\'<div class="pi-text"><h4>\'+escapeHtml(nome)+\'</h4>\'+(quantita?\'<div class="pq">\'+escapeHtml(quantita)+\'</div>\':"")+\'<p>\'+escapeHtml(descrizione||"")+\'</p>\'+\'<div class="pnotes">Note: ______________________________________________</div>\'+\'</div></div>\';}' +
       'function buildTitleHtml(paziente,dataVal,note){return \'<div class="print-head"><h1>Scheda esercizi</h1><div class="print-meta">\'+(paziente?\'<span>Paziente: \'+escapeHtml(paziente)+\'</span>\':"")+\'<span>Data: \'+escapeHtml(dataVal)+\'</span></div>\'+(note?\'<div class="print-note">\'+escapeHtml(note)+\'</div>\':"")+\'</div>\';}' +
       'function buildA4Sheets(container,headerSrc,footerSrc,paziente,dataVal,note,items){' +
         'container.innerHTML="";' +
@@ -1254,12 +1377,13 @@
         'var pageInnerHPx=cmToPx(29.7-2*1);' +
         'var headerHPx=cmToPx(contentWCm*0.0959)+cmToPx(0.5);' +
         'var footerHPx=cmToPx(contentWCm*0.0690)+cmToPx(0.5);' +
-        'var avail=pageInnerHPx-headerHPx-footerHPx-cmToPx(0.4);' +
+        'var pageNumH=cmToPx(0.6);' +
+        'var avail=pageInnerHPx-headerHPx-footerHPx-pageNumH-cmToPx(0.9);' +
         'var probe=document.createElement("div");' +
         'probe.style.cssText="position:absolute;left:-99999px;top:0;width:"+contentWPx+"px;visibility:hidden;";' +
         'document.body.appendChild(probe);' +
         'function measure(html){var d=document.createElement("div");d.innerHTML=html;probe.appendChild(d);var h=d.getBoundingClientRect().height;probe.removeChild(d);return h;}' +
-        'var titleHtml=buildTitleHtml(paziente,dataVal,note);var titleH=measure(titleHtml);' +
+        'var titleHtml=buildTitleHtml(paziente,dataVal,note);var titleH=items.length?measure(titleHtml):0;' +
         'var itemHtmls=items.map(function(it){return buildItemHtml(it.imgSrc,it.nome,it.quantita,it.descrizione);});' +
         'var itemHeights=itemHtmls.map(measure);' +
         'document.body.removeChild(probe);' +
@@ -1267,12 +1391,15 @@
         'for(var i=0;i<itemHtmls.length;i++){var h=itemHeights[i];' +
           'if(current.length>0 && (used+h)>avail){pages.push({items:current,isFirst:isFirstPage});current=[];isFirstPage=false;used=0;}' +
           'current.push(i);used+=h;}' +
-        'pages.push({items:current,isFirst:isFirstPage});' +
-        'pages.forEach(function(pg){' +
+        'if(current.length>0 || (isFirstPage && items.length===0)){pages.push({items:current,isFirst:isFirstPage});}' +
+        'if(pages.length===0){pages.push({items:[],isFirst:true});}' +
+        'var totalPages=pages.length;' +
+        'pages.forEach(function(pg,pgIndex){' +
           'var sheet=document.createElement("div");sheet.className="a4-sheet";' +
           'var hi=document.createElement("img");hi.className="a4-header";hi.src=headerSrc;hi.alt="Centro di medicina";sheet.appendChild(hi);' +
           'var body=document.createElement("div");body.className="a4-body";' +
           'var bodyHtml="";if(pg.isFirst)bodyHtml+=titleHtml;pg.items.forEach(function(i){bodyHtml+=itemHtmls[i];});body.innerHTML=bodyHtml;sheet.appendChild(body);' +
+          'if(totalPages>1){var pn=document.createElement("div");pn.className="a4-page-number";pn.textContent="Pagina "+(pgIndex+1)+" di "+totalPages;sheet.appendChild(pn);}' +
           'var fi=document.createElement("img");fi.className="a4-footer";fi.src=footerSrc;fi.alt="";sheet.appendChild(fi);' +
           'container.appendChild(sheet);' +
         '});' +
@@ -1335,102 +1462,6 @@
     }
   };
 
-  // ---------- CONDIVIDI LINK ----------
-  // La scheda viene codificata come JSON compatto (id esercizi + paziente/
-  // data/note) in base64 nel parametro ?scheda= dell'URL. Non servono le
-  // immagini: chi apre il link ha gia' l'intero database esercizi nell'app
-  // (data.js), quindi il link resta piccolo e funziona anche via SMS/chat.
-  // Chi lo apre la prima volta ha bisogno di una connessione (per scaricare
-  // l'app se non l'ha mai visitata); da li' in poi, grazie al service
-  // worker, anche i link aperti restano disponibili offline.
-  function encodeSchedaToParam(){
-    var payload = {
-      v: 1,
-      ids: Array.from(state.selected),
-      paziente: fPaziente.value || "",
-      dataVal: fData.value || "",
-      note: fNote.value || ""
-    };
-    var json = JSON.stringify(payload);
-    var b64 = btoa(unescape(encodeURIComponent(json)));
-    // base64 URL-safe
-    return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-  }
-
-  function decodeSchedaFromParam(param){
-    try{
-      var b64 = param.replace(/-/g, "+").replace(/_/g, "/");
-      while(b64.length % 4) b64 += "=";
-      var json = decodeURIComponent(escape(atob(b64)));
-      var payload = JSON.parse(json);
-      if(!payload || !Array.isArray(payload.ids)) return null;
-      return payload;
-    }catch(e){ return null; }
-  }
-
-  document.getElementById("shareLinkBtn").onclick = async function(){
-    if(state.selected.size===0){
-      alert("La scheda e' vuota: aggiungi almeno un esercizio prima di condividere.");
-      return;
-    }
-    var param = encodeSchedaToParam();
-    var url = location.origin + location.pathname + "?scheda=" + param;
-    var statusEl = document.getElementById("saveStatus");
-    try{
-      if(navigator.share){
-        await navigator.share({title:"Scheda esercizi", url: url});
-        return;
-      }
-    }catch(e){ /* utente ha annullato la condivisione: continua sotto */ }
-    try{
-      await navigator.clipboard.writeText(url);
-      statusEl.textContent = "Link copiato negli appunti.";
-    }catch(e){
-      window.prompt("Copia questo link per condividere la scheda:", url);
-    }
-    setTimeout(function(){ statusEl.textContent=""; }, 4000);
-  };
-
-  function applySchedaFromPayload(payload){
-    var validIds = payload.ids.filter(function(id){ return !!byId[id]; });
-    if(validIds.length===0){
-      alert("Il link non contiene esercizi validi per questo database.");
-      return;
-    }
-    state.selected = new Set(validIds);
-    saveSelected();
-    if(payload.paziente) fPaziente.value = payload.paziente;
-    if(payload.dataVal) fData.value = payload.dataVal;
-    if(payload.note) fNote.value = payload.note;
-    saveField("raccolta_esercizi_paziente", fPaziente.value);
-    saveField("raccolta_esercizi_data", fData.value);
-    saveField("raccolta_esercizi_note", fNote.value);
-    render();
-    document.getElementById("drawerOverlay").classList.add("open");
-    document.getElementById("drawer").classList.add("open");
-  }
-
-  function checkSchedaLinkOnLoad(){
-    var params = new URLSearchParams(location.search);
-    var param = params.get("scheda");
-    if(!param) return;
-    var payload = decodeSchedaFromParam(param);
-    if(!payload){
-      alert("Il link condiviso non e' valido o e' danneggiato.");
-      return;
-    }
-    var n = payload.ids.length;
-    var msg = "E' stato aperto un link con una scheda condivisa (" + n +
-      " esercizi" + (payload.paziente ? ", paziente: " + payload.paziente : "") +
-      "). Vuoi caricarla, sostituendo la scheda attuale?";
-    if(window.confirm(msg)){
-      applySchedaFromPayload(payload);
-    }
-    // ripulisce l'URL per evitare di richiedere di nuovo al refresh
-    var cleanUrl = location.origin + location.pathname;
-    history.replaceState(null, "", cleanUrl);
-  }
-
   function downloadFallback(html, filename){
     var blob = new Blob([html], {type:"text/html"});
     var url = URL.createObjectURL(blob);
@@ -1455,6 +1486,297 @@
     }, 120);
   });
 
+  // ---------- LIBRERIA SCHEDE (salvataggio multiplo, riutilizzabile offline) ----------
+  var LIB_KEY = "raccolta_esercizi_libreria_schede";
+  function loadLibrary(){
+    try{
+      var raw = localStorage.getItem(LIB_KEY);
+      if(raw) return JSON.parse(raw);
+    }catch(e){}
+    return [];
+  }
+  function saveLibrary(list){
+    try{ localStorage.setItem(LIB_KEY, JSON.stringify(list)); }catch(e){}
+  }
+  function uid(){ return "s" + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+
+  function currentSchedaData(){
+    return {
+      paziente: fPaziente.value || "",
+      dataVal: fData.value || new Date().toLocaleDateString("it-IT"),
+      note: fNote.value || "",
+      ids: Array.from(state.selected)
+    };
+  }
+
+  document.getElementById("saveToLibraryBtn").onclick = function(){
+    if(state.selected.size===0){
+      alert("La scheda e' vuota: aggiungi almeno un esercizio prima di salvarla nella libreria.");
+      return;
+    }
+    var cur = currentSchedaData();
+    var suggestion = cur.paziente ? (cur.paziente + " - " + cur.dataVal) : ("Scheda " + cur.dataVal);
+    var nome = prompt("Nome della scheda:", suggestion);
+    if(nome===null) return;
+    nome = nome.trim() || suggestion;
+    var list = loadLibrary();
+    list.unshift({
+      id: uid(), nome: nome, paziente: cur.paziente, dataVal: cur.dataVal,
+      note: cur.note, ids: cur.ids, createdAt: Date.now()
+    });
+    saveLibrary(list);
+    var statusEl = document.getElementById("saveStatus");
+    statusEl.textContent = "Scheda salvata nella libreria.";
+    setTimeout(function(){ statusEl.textContent=""; }, 3000);
+  };
+
+  function renderLibrary(){
+    var body = document.getElementById("libraryBody");
+    var list = loadLibrary();
+    body.innerHTML = "";
+    if(list.length===0){
+      var empty = document.createElement("div");
+      empty.className = "lib-empty";
+      empty.textContent = 'Nessuna scheda salvata. Componi una scheda e usa "Salva nella libreria".';
+      body.appendChild(empty);
+      return;
+    }
+    list.forEach(function(s){
+      var card = document.createElement("div");
+      card.className = "lib-card";
+
+      var info = document.createElement("div");
+      info.className = "lc-info";
+      var name = document.createElement("div");
+      name.className = "lc-name"; name.textContent = s.nome;
+      info.appendChild(name);
+      var meta = document.createElement("div");
+      meta.className = "lc-meta";
+      var n = (s.ids||[]).length;
+      var metaParts = [];
+      if(s.paziente) metaParts.push(s.paziente);
+      if(s.dataVal) metaParts.push(s.dataVal);
+      metaParts.push(n + (n===1 ? " esercizio" : " esercizi"));
+      meta.textContent = metaParts.join(" · ");
+      info.appendChild(meta);
+      card.appendChild(info);
+
+      var actions = document.createElement("div");
+      actions.className = "lc-actions";
+
+      var openBtn = document.createElement("button");
+      openBtn.className = "btn primary"; openBtn.textContent = "Apri";
+      openBtn.onclick = function(){
+        fPaziente.value = s.paziente || "";
+        fData.value = s.dataVal || "";
+        fNote.value = s.note || "";
+        saveField("raccolta_esercizi_paziente", fPaziente.value);
+        saveField("raccolta_esercizi_data", fData.value);
+        saveField("raccolta_esercizi_note", fNote.value);
+        state.selected = new Set(s.ids||[]);
+        saveSelected(); updateSchedaCount(); renderDrawer(); renderGrid();
+        closeLibrary();
+        openDrawer();
+      };
+      actions.appendChild(openBtn);
+
+      var linkBtn = document.createElement("button");
+      linkBtn.className = "btn"; linkBtn.textContent = "Link";
+      linkBtn.onclick = function(){ openShareModal(s); };
+      actions.appendChild(linkBtn);
+
+      var fileBtn = document.createElement("button");
+      fileBtn.className = "btn"; fileBtn.textContent = "File";
+      fileBtn.onclick = async function(){
+        fileBtn.disabled = true;
+        try{
+          var html = await buildStandaloneSchedaHTML({paziente:s.paziente, dataVal:s.dataVal, note:s.note, ids:s.ids});
+          var filename = "Scheda_" + slugify(s.paziente) + "_" + slugify(s.dataVal) + ".html";
+          downloadFallback(html, filename);
+        }catch(e){
+          alert("Non sono riuscito a generare il file: " + (e && e.message ? e.message : e));
+        }finally{
+          fileBtn.disabled = false;
+        }
+      };
+      actions.appendChild(fileBtn);
+
+      var delBtn = document.createElement("button");
+      delBtn.className = "btn danger"; delBtn.textContent = "Elimina";
+      delBtn.onclick = function(){
+        if(!confirm('Eliminare definitivamente la scheda "' + s.nome + '"?')) return;
+        var list2 = loadLibrary().filter(function(x){ return x.id !== s.id; });
+        saveLibrary(list2);
+        renderLibrary();
+      };
+      actions.appendChild(delBtn);
+
+      card.appendChild(actions);
+      body.appendChild(card);
+    });
+  }
+
+  function openLibrary(){ renderLibrary(); document.getElementById("libraryOverlay").classList.add("open"); }
+  function closeLibrary(){ document.getElementById("libraryOverlay").classList.remove("open"); }
+  document.getElementById("openLibraryBtn").onclick = openLibrary;
+  document.getElementById("libraryClose").onclick = closeLibrary;
+  document.getElementById("libraryOverlay").addEventListener("click", function(ev){ if(ev.target===this) closeLibrary(); });
+
+  // ---------- CONDIVISIONE VIA LINK ----------
+  // La scheda viene codificata (paziente/data/note/id esercizi) in base64 nel
+  // frammento dell'URL (#s=...). Chi apre il link, sullo stesso sito, la vede
+  // subito: gli esercizi (nomi, immagini, descrizioni) arrivano dal database
+  // gia' incorporato nell'app (data.js), quindi il link resta corto anche
+  // con molte esercizi selezionati, e funziona offline se l'app e' gia'
+  // stata aperta almeno una volta su quel dispositivo.
+  function b64EncodeUnicode(str){
+    return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function(_, p1){
+      return String.fromCharCode(parseInt(p1, 16));
+    }));
+  }
+  function b64DecodeUnicode(str){
+    return decodeURIComponent(Array.prototype.map.call(atob(str), function(c){
+      return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(""));
+  }
+  function encodeSchedaForLink(s){
+    var payload = {n: s.nome||"", p: s.paziente||"", d: s.dataVal||"", no: s.note||"", i: s.ids||[]};
+    return b64EncodeUnicode(JSON.stringify(payload));
+  }
+  function decodeSchedaFromLink(code){
+    try{
+      var payload = JSON.parse(b64DecodeUnicode(code));
+      return {
+        nome: payload.n || "Scheda condivisa",
+        paziente: payload.p || "",
+        dataVal: payload.d || "",
+        note: payload.no || "",
+        ids: Array.isArray(payload.i) ? payload.i : []
+      };
+    }catch(e){ return null; }
+  }
+  function shareLinkFor(s){
+    return location.origin + location.pathname + "#s=" + encodeSchedaForLink(s);
+  }
+  function openShareModal(s){
+    var input = document.getElementById("shareLinkInput");
+    input.value = shareLinkFor(s);
+    document.getElementById("shareOverlay").classList.add("open");
+    setTimeout(function(){ input.focus(); input.select(); }, 50);
+  }
+  document.getElementById("shareLinkBtn").onclick = function(){
+    if(state.selected.size===0){
+      alert("La scheda e' vuota: aggiungi almeno un esercizio prima di condividerla.");
+      return;
+    }
+    openShareModal({
+      nome: fPaziente.value ? (fPaziente.value + " - " + (fData.value||"")) : "Scheda",
+      paziente: fPaziente.value, dataVal: fData.value, note: fNote.value,
+      ids: Array.from(state.selected)
+    });
+  };
+  document.getElementById("shareCloseBtn").onclick = function(){ document.getElementById("shareOverlay").classList.remove("open"); };
+  document.getElementById("shareOverlay").addEventListener("click", function(ev){ if(ev.target===this) this.classList.remove("open"); });
+  document.getElementById("shareCopyBtn").onclick = function(){
+    var input = document.getElementById("shareLinkInput");
+    input.select();
+    var copied = false;
+    try{
+      if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(input.value); copied = true; }
+    }catch(e){}
+    if(!copied){ try{ document.execCommand("copy"); copied = true; }catch(e){} }
+    var btn = document.getElementById("shareCopyBtn");
+    var orig = btn.textContent;
+    btn.textContent = copied ? "Copiato!" : "Seleziona e copia";
+    setTimeout(function(){ btn.textContent = orig; }, 1800);
+  };
+
+  // ---------- IMPORTAZIONE SCHEDA DA LINK ----------
+  // Il link "Condividi" rimanda direttamente alla sola scheda condivisa,
+  // mostrata subito in anteprima di sola lettura (non all'intera app).
+  var pendingImport = null;
+  function itemsForIds(ids){
+    return ids.map(function(id){
+      var e = byId[id];
+      if(!e) return null;
+      return { imgSrc: e.img || "", nome: e.nome, quantita: e.quantita, descrizione: e.descrizione };
+    }).filter(Boolean);
+  }
+  function checkImportFromHash(){
+    var h = location.hash || "";
+    var m = h.match(/#s=(.+)$/);
+    if(!m) return;
+    var scheda = decodeSchedaFromLink(decodeURIComponent(m[1]));
+    if(!scheda || !scheda.ids || scheda.ids.length===0) return;
+    pendingImport = scheda;
+
+    buildA4Sheets(
+      document.getElementById("previewPages"), lhHeaderSrc(), lhFooterSrc(),
+      scheda.paziente, scheda.dataVal || new Date().toLocaleDateString("it-IT"),
+      scheda.note, itemsForIds(scheda.ids)
+    );
+    document.getElementById("previewOverlay").classList.add("open");
+
+    var n = scheda.ids.length;
+    var parts = [];
+    if(scheda.paziente) parts.push(scheda.paziente);
+    parts.push(n + (n===1 ? " esercizio" : " esercizi"));
+    document.getElementById("importBannerText").textContent =
+      "Stai vedendo una scheda condivisa (" + parts.join(" · ") + ").";
+    document.getElementById("importBanner").classList.add("open");
+  }
+  document.getElementById("importBannerAccept").onclick = function(){
+    if(!pendingImport) return;
+    var s = pendingImport;
+    fPaziente.value = s.paziente || "";
+    fData.value = s.dataVal || new Date().toLocaleDateString("it-IT");
+    fNote.value = s.note || "";
+    saveField("raccolta_esercizi_paziente", fPaziente.value);
+    saveField("raccolta_esercizi_data", fData.value);
+    saveField("raccolta_esercizi_note", fNote.value);
+    state.selected = new Set(s.ids);
+    saveSelected(); updateSchedaCount(); renderDrawer(); renderGrid();
+    var list = loadLibrary();
+    list.unshift({
+      id: uid(), nome: s.nome || "Scheda condivisa", paziente: s.paziente, dataVal: s.dataVal,
+      note: s.note, ids: s.ids, createdAt: Date.now()
+    });
+    saveLibrary(list);
+    document.getElementById("importBanner").classList.remove("open");
+    document.getElementById("previewOverlay").classList.remove("open");
+    pendingImport = null;
+    history.replaceState(null, "", location.pathname + location.search);
+    openDrawer();
+  };
+  document.getElementById("importBannerDismiss").onclick = function(){
+    document.getElementById("importBanner").classList.remove("open");
+    document.getElementById("previewOverlay").classList.remove("open");
+    pendingImport = null;
+    history.replaceState(null, "", location.pathname + location.search);
+  };
+
+  // ---------- STATO CONNESSIONE ----------
+  function updateConnBadge(){
+    var badge = document.getElementById("connBadge");
+    if(navigator.onLine){
+      badge.textContent = "In linea";
+      badge.className = "offline-badge online";
+    } else {
+      badge.textContent = "Offline";
+      badge.className = "offline-badge offline";
+    }
+  }
+  window.addEventListener("online", updateConnBadge);
+  window.addEventListener("offline", updateConnBadge);
+  updateConnBadge();
+
+  // ---------- SERVICE WORKER (permette l'uso offline dopo il primo caricamento) ----------
+  if("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")){
+    window.addEventListener("load", function(){
+      navigator.serviceWorker.register("sw.js").catch(function(){});
+    });
+  }
+
   // ---------- RENDER ----------
   function render(){
     renderTree();
@@ -1463,7 +1785,7 @@
   }
 
   render();
-  checkSchedaLinkOnLoad();
+  checkImportFromHash();
 })();
 </script>
 </body>
