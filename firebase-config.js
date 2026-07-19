@@ -1,12 +1,8 @@
 // ============================================================================
-// CONFIGURAZIONE FIREBASE — da compilare con i dati del TUO progetto.
-// Segui FIREBASE_SETUP.md per crearlo (gratuito, ~10 minuti).
-// Dopo aver creato il progetto e l'app web su firebase.google.com/,
-// la console ti mostra un blocco "firebaseConfig" identico a questo:
-// copia i valori veri al posto dei segnaposto qui sotto.
+// CONFIGURAZIONE FIREBASE — progetto "raccolta-esercizi"
 // ============================================================================
 const FIREBASE_CONFIG = {
- apiKey: "AIzaSyC-lXiauVa5lzZAjvxbZ6J51WsbkD0vjxI",
+  apiKey: "AIzaSyC-lXiauVa5lzZAjvxbZ6J51WsbkD0vjxI",
   authDomain: "raccolta-esercizi.firebaseapp.com",
   projectId: "raccolta-esercizi",
   storageBucket: "raccolta-esercizi.firebasestorage.app",
