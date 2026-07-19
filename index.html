@@ -5,16 +5,16 @@
 <title>Raccolta Esercizi</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#0f6a37">
+<meta name="theme-color" content="#F5C400">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" href="icon-192.png">
 <style>
   :root{
-    --accent:#0f6a37;
-    --accent-dark:#0a4d28;
-    --accent-light:#e6f2ea;
-    --accent-pale:#f2f8f4;
-    --bg:#f6f9f7;
+    --accent:#F5C400;
+    --accent-dark:#7a5c00;
+    --accent-light:#fff3c4;
+    --accent-pale:#fffaf0;
+    --bg:#f9f7f0;
     --panel:#ffffff;
     --border:#e2e5e8;
     --text:#1f2933;
@@ -87,13 +87,13 @@
     white-space:nowrap;
   }
   .btn:hover{background:var(--bg);}
-  .btn.primary{background:var(--accent); border-color:var(--accent); color:#fff;}
-  .btn.primary:hover{background:var(--accent-dark);}
+  .btn.primary{background:var(--accent); border-color:var(--accent); color:#3a2e00; font-weight:700;}
+  .btn.primary:hover{background:var(--accent-dark); color:#fff;}
   .btn.danger{color:#b42318;}
   .btn svg{width:15px;height:15px;}
   .badge-count{
     background:var(--accent);
-    color:#fff;
+    color:#3a2e00;
     border-radius:999px;
     font-size:11px;
     padding:1px 7px;
@@ -356,8 +356,6 @@
   .is-editor .editor-only{display:inline-flex;}
   .editor-only.block-when-on{display:none;}
   .is-editor .editor-only.block-when-on{display:block;}
-  #editorLockBtn{position:relative;}
-  #editorLockBtn.on{background:var(--accent-dark); color:#fff; border-color:var(--accent-dark);}
 
   .simple-modal-overlay{
     position:fixed; inset:0; background:rgba(20,25,30,.55);
@@ -383,6 +381,109 @@
   .tree-edit-row .tr-label{font-size:11.5px; color:var(--text-muted); flex-shrink:0; width:90px;}
   .tree-edit-row input{flex:1;}
   .tree-edit-row button{flex-shrink:0;}
+
+  .modal-tags{
+    display:flex; flex-wrap:wrap; gap:6px; padding:10px 22px 0;
+  }
+  .tag-chip{
+    background:var(--accent-pale); color:var(--accent-dark); border:1px solid var(--accent-light);
+    border-radius:999px; padding:3px 10px; font-size:11.5px; font-weight:600;
+  }
+  .tree-rename-btn{
+    display:none; align-items:center; justify-content:center; flex-shrink:0;
+    width:20px; height:20px; border:none; background:transparent; color:var(--text-muted);
+    border-radius:5px; cursor:pointer; margin-left:4px;
+  }
+  .is-editor .tree-rename-btn{display:inline-flex;}
+  .tree-rename-btn:hover{background:var(--accent-light); color:var(--accent-dark);}
+  .tree-rename-input{
+    flex:1; min-width:0; font-size:13px; padding:2px 6px; border:1px solid var(--accent);
+    border-radius:5px; background:#fff; color:var(--text); margin-right:6px;
+  }
+  /* ---------- VISTA SCHEDA CONDIVISA (link diretto, senza il resto dell'app) ---------- */
+  .shared-view{display:none;}
+  body.shared-mode > header,
+  body.shared-mode > .layout,
+  body.shared-mode .gate-overlay{
+    display:none !important;
+  }
+  body.shared-mode .shared-view{
+    display:block; position:fixed; inset:0; background:var(--bg); z-index:50; overflow-y:auto;
+  }
+  .shared-view-bar{
+    position:sticky; top:0; z-index:2; background:#fff; border-bottom:1px solid var(--border);
+    padding:14px 20px; display:flex; align-items:center; justify-content:space-between; gap:14px;
+  }
+  .shared-view-title{font-weight:700; font-size:15px;}
+  .shared-view-scroll{padding:30px 16px 60px;}
+  @media print{
+    body.shared-mode .shared-view-bar{display:none;}
+  }
+
+  /* ---------- GATE DI ACCESSO OBBLIGATORIO ---------- */
+  .gate-overlay{
+    position:fixed; inset:0; background:var(--bg);
+    display:none; align-items:center; justify-content:center; z-index:1000; padding:24px;
+  }
+  .gate-overlay.open{display:flex;}
+  .gate-box{
+    background:#fff; border-radius:16px; max-width:380px; width:100%;
+    padding:32px 28px; box-shadow:0 20px 60px rgba(0,0,0,.15); text-align:center;
+  }
+  .gate-logo{width:64px; height:64px; border-radius:14px; margin-bottom:14px;}
+  .gate-box h2{margin:0 0 6px; font-size:19px;}
+  .gate-box p{margin:0 0 18px; font-size:13px; color:var(--text-muted);}
+  .gate-box label{display:block; text-align:left; font-size:12.5px; font-weight:600; color:var(--text-muted); margin:10px 0 4px;}
+  .gate-box input{
+    width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid var(--border);
+    border-radius:8px; font-size:14px; font-family:inherit; background:var(--bg); color:var(--text);
+  }
+  .gate-box .err-text{color:#b42318; font-size:12.5px; min-height:16px; margin-top:8px; text-align:left;}
+
+  .account-badge{
+    display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600;
+    color:var(--text); background:var(--bg); border:1px solid var(--border);
+    border-radius:999px; padding:5px 6px 5px 12px;
+  }
+  .account-badge .btn{padding:4px 8px;}
+
+  .log-row{
+    display:grid; grid-template-columns:150px 130px 1fr; gap:10px; padding:8px 0;
+    border-bottom:1px solid var(--border); font-size:13px; align-items:start;
+  }
+  .log-when{color:var(--text-muted); font-size:12px;}
+  .log-who{font-weight:700; color:var(--accent-dark);}
+
+  .folder-check-list{
+    max-height:280px; overflow-y:auto; border:1px solid var(--border); border-radius:8px; padding:6px 10px;
+  }
+  .folder-check-row{
+    display:flex; align-items:center; gap:8px; padding:6px 2px; font-size:13.5px;
+    border-bottom:1px solid var(--border);
+  }
+  .folder-check-row:last-child{border-bottom:none;}
+  .folder-check-row input[type=checkbox]{width:16px; height:16px; flex-shrink:0;}
+  .folder-check-row .fc-count{margin-left:auto; font-size:11px; color:var(--text-muted);}
+
+  /* ---------- TRASCINAMENTO ESERCIZIO SU CARTELLA (mouse e tocco) ---------- */
+  .is-editor .card{touch-action:none;}
+  .drag-ghost{
+    position:fixed; z-index:500; pointer-events:none;
+    background:var(--accent-dark); color:#fff; font-size:12.5px; font-weight:600;
+    padding:8px 14px; border-radius:999px; box-shadow:0 6px 18px rgba(0,0,0,.3);
+    max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    transform:translate(-50%,-130%);
+  }
+  .tree-row.drop-target{
+    background:var(--accent-light); outline:2px dashed var(--accent-dark); outline-offset:-2px;
+  }
+  .tree-row.drop-flash{
+    animation:dropFlash .6s ease;
+  }
+  @keyframes dropFlash{
+    0%{background:var(--accent-dark); color:#fff;}
+    100%{background:transparent; color:inherit;}
+  }
 
 
   /* ---------- CONTENUTO SCHEDA (usato sia nell'anteprima a schermo che in stampa) ---------- */
@@ -494,6 +595,21 @@
   </div>
 </div>
 
+<!-- VISTA SCHEDA CONDIVISA -->
+<!-- Quando il link contiene #s=..., viene mostrata SOLO questa vista pulita
+     (niente header, niente albero, niente login): esattamente la scheda,
+     pronta da leggere o scaricare/stampare in PDF. Il resto dell'app resta
+     nascosto e non viene nemmeno inizializzato. -->
+<div class="shared-view" id="sharedView">
+  <div class="shared-view-bar">
+    <div class="shared-view-title">Scheda esercizi condivisa</div>
+    <button class="btn primary" id="sharedDownloadBtn">Scarica / Stampa PDF</button>
+  </div>
+  <div class="shared-view-scroll">
+    <div id="sharedViewPages"></div>
+  </div>
+</div>
+
 <header>
   <h1>Raccolta Esercizi</h1>
   <div class="search-wrap">
@@ -506,10 +622,15 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     Aggiungi esercizio
   </button>
-  <button class="btn editor-only" id="editTreeBtn">Modifica albero</button>
-  <button class="btn" id="editorLockBtn" title="Modalita' editor: elimina, aggiungi e sposta esercizi">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-  </button>
+  <button class="btn editor-only" id="editTreeBtn">Nuova cartella</button>
+  <button class="btn editor-only" id="manageTemplatesBtn">Modelli</button>
+  <button class="btn editor-only" id="openLogBtn">Cronologia</button>
+  <div class="account-badge" id="accountBadge" style="display:none;">
+    <span id="accountName"></span>
+    <button class="btn" id="accountLogoutBtn" title="Esci">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+    </button>
+  </div>
   <button class="btn" id="openLibraryBtn">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v13h18V7"/><path d="M3 7l2-4h14l2 4"/><path d="M3 7h18"/></svg>
     Le mie schede
@@ -544,6 +665,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
     <img class="modal-img" id="modalImg" src="" alt="">
+    <div class="modal-tags" id="modalTags"></div>
     <div class="modal-body">
       <div class="crumbs" id="modalCrumbs"></div>
 
@@ -563,7 +685,7 @@
         <button class="btn" id="modalResetBtn" style="display:none;">Ripristina originale</button>
       </div>
       <div class="modal-actions editor-only">
-        <button class="btn" id="modalMoveBtn">Sposta in un'altra cartella</button>
+        <button class="btn" id="modalMoveBtn">Cartelle</button>
         <button class="btn danger" id="modalDeleteBtn">Elimina esercizio</button>
       </div>
     </div>
@@ -594,6 +716,10 @@
     <div>
       <label>Note</label>
       <textarea id="fNote" rows="2" placeholder="Note generali sulla scheda (opzionale)"></textarea>
+    </div>
+    <div>
+      <label>Modello / carta intestata</label>
+      <select id="fTemplate"></select>
     </div>
   </div>
   <div class="drawer-list" id="drawerList"></div>
@@ -657,20 +783,31 @@
   </div>
 </div>
 
-<!-- LOGIN MODALITA' EDITOR -->
-<div class="simple-modal-overlay" id="loginOverlay">
-  <div class="simple-modal">
-    <h3>Modalità editor</h3>
-    <p style="margin:0 0 4px; font-size:13px; color:var(--text-muted);">Accedi per eliminare, aggiungere o spostare esercizi e modificare l'albero delle cartelle. Le modifiche saranno visibili a chiunque apra l'app.</p>
-    <label for="loginEmail">Email</label>
-    <input type="email" id="loginEmail" autocomplete="username">
-    <label for="loginPassword">Password</label>
-    <input type="password" id="loginPassword" autocomplete="current-password">
-    <div class="err-text" id="loginError"></div>
-    <div class="modal-actions">
-      <button class="btn" id="loginCancelBtn">Annulla</button>
-      <button class="btn primary" id="loginSubmitBtn">Accedi</button>
+<!-- GATE DI ACCESSO OBBLIGATORIO -->
+<div class="gate-overlay" id="gateOverlay">
+  <div class="gate-box">
+    <img src="icon-192.png" alt="" class="gate-logo">
+    <h2>Raccolta Esercizi</h2>
+    <p>Accesso riservato: inserisci le credenziali che ti sono state fornite.</p>
+    <label for="gateEmail">Email</label>
+    <input type="email" id="gateEmail" autocomplete="username">
+    <label for="gatePassword">Password</label>
+    <input type="password" id="gatePassword" autocomplete="current-password">
+    <div class="err-text" id="gateError"></div>
+    <button class="btn primary" id="gateSubmitBtn" style="width:100%; justify-content:center; margin-top:6px;">Accedi</button>
+  </div>
+</div>
+
+<!-- CRONOLOGIA MODIFICHE -->
+<div class="lib-overlay" id="logOverlay">
+  <div class="lib-modal">
+    <div class="lib-head">
+      <h3>Cronologia modifiche</h3>
+      <button class="close-x" id="logClose" style="position:static;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
     </div>
+    <div class="lib-body" id="logBody"></div>
   </div>
 </div>
 
@@ -699,18 +836,18 @@
   </div>
 </div>
 
-<!-- SPOSTA ESERCIZIO -->
-<div class="simple-modal-overlay" id="moveExerciseOverlay">
-  <div class="simple-modal">
-    <h3>Sposta esercizio</h3>
-    <label for="moveExArea">Nuova area</label>
-    <input type="text" id="moveExArea" list="areaListDatalist">
-    <label for="moveExPath">Nuova cartella (facoltativa, usa "/" per sottocartelle)</label>
-    <input type="text" id="moveExPath">
-    <div class="err-text" id="moveExerciseError"></div>
+<!-- CARTELLE ESERCIZIO (appartenenza multipla) -->
+<div class="simple-modal-overlay" id="foldersOverlay">
+  <div class="simple-modal wide">
+    <h3>In quali cartelle si trova questo esercizio</h3>
+    <p style="margin:0 0 10px; font-size:12.5px; color:var(--text-muted);">Seleziona una o più cartelle: l'esercizio comparirà sfogliandole tutte. Puoi anche trascinare la card di un esercizio direttamente su una cartella nell'albero a sinistra per aggiungerla al volo.</p>
+    <div class="folder-check-list" id="folderCheckList"></div>
+    <label for="newFolderInline" style="margin-top:14px;">Aggiungi una cartella nuova al volo</label>
+    <input type="text" id="newFolderInline" placeholder='Es. Arto Inferiore/Ginocchio (usa "/" per sottocartelle)'>
+    <div class="err-text" id="foldersError"></div>
     <div class="modal-actions">
-      <button class="btn" id="moveExerciseCancelBtn">Annulla</button>
-      <button class="btn primary" id="moveExerciseSubmitBtn">Sposta</button>
+      <button class="btn" id="foldersCancelBtn">Annulla</button>
+      <button class="btn primary" id="foldersSubmitBtn">Salva</button>
     </div>
   </div>
 </div>
@@ -718,10 +855,9 @@
 <!-- MODIFICA ALBERO -->
 <div class="simple-modal-overlay" id="editTreeOverlay">
   <div class="simple-modal wide">
-    <h3>Modifica albero cartelle</h3>
-    <p style="margin:0 0 10px; font-size:12.5px; color:var(--text-muted);">Rinomina una cartella esistente (si applica anche alle sue sottocartelle), oppure crea una cartella vuota da riempire in seguito.</p>
-    <div id="treeEditList"></div>
-    <label for="newFolderArea" style="margin-top:16px;">Crea cartella vuota — Area</label>
+    <h3>Nuova cartella</h3>
+    <p style="margin:0 0 10px; font-size:12.5px; color:var(--text-muted);">Per rinominare una cartella esistente, usa l'icona a matita direttamente nell'albero a sinistra. Qui puoi creare una cartella vuota da riempire in seguito.</p>
+    <label for="newFolderArea">Area</label>
     <input type="text" id="newFolderArea" list="areaListDatalist">
     <label for="newFolderPath">Percorso (usa "/" per sottocartelle)</label>
     <input type="text" id="newFolderPath" placeholder="Es. Nuova Categoria">
@@ -729,6 +865,32 @@
     <div class="modal-actions">
       <button class="btn" id="editTreeCloseBtn">Chiudi</button>
       <button class="btn primary" id="addFolderSubmitBtn">Crea cartella</button>
+    </div>
+  </div>
+</div>
+
+<!-- GESTISCI MODELLI DI CARTA INTESTATA -->
+<div class="lib-overlay" id="templatesOverlay">
+  <div class="lib-modal">
+    <div class="lib-head">
+      <h3>Modelli di carta intestata</h3>
+      <button class="close-x" id="templatesClose" style="position:static;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="lib-body">
+      <div id="templatesList"></div>
+      <h4 style="margin:18px 0 8px; font-size:14px;">Carica un nuovo modello</h4>
+      <label for="newTplNome">Nome del modello</label>
+      <input type="text" id="newTplNome" placeholder="Es. Studio Rossi">
+      <label for="newTplHeader">Immagine intestazione (facoltativa)</label>
+      <input type="file" id="newTplHeader" accept="image/*">
+      <label for="newTplFooter">Immagine piè di pagina (facoltativa)</label>
+      <input type="file" id="newTplFooter" accept="image/*">
+      <div class="err-text" id="templatesError"></div>
+      <div class="modal-actions">
+        <button class="btn primary" id="uploadTplBtn">Carica modello</button>
+      </div>
     </div>
   </div>
 </div>
@@ -772,7 +934,13 @@
   // Override condivisi (catalogo gestito dalla modalita' editor, sincronizzati
   // via Firebase): finche' Firebase non ha ancora risposto, sono vuoti, quindi
   // l'app si comporta come prima (solo dati da data.js).
-  var FIRESTORE_OVERRIDES = {deletedIds: [], moves: {}, customExercises: [], treeRenames: {}, customFolders: []};
+  // Rilevato il prima possibile: se il link contiene una scheda condivisa
+  // (#s=...), l'app mostra SOLO quella scheda (niente gate, niente resto
+  // dell'app) -- vedi initSharedView() piu' in basso.
+  var SHARED_MODE = /#s=/.test(location.hash || "");
+  if(SHARED_MODE) document.body.classList.add("shared-mode");
+
+  var FIRESTORE_OVERRIDES = {deletedIds: [], folders: {}, moves: {}, customExercises: [], treeRenames: {}, customFolders: []};
 
   var BASE_EXERCISES = EXERCISES;
   var CURRENT_EXERCISES = BASE_EXERCISES;
@@ -894,13 +1062,21 @@
     var row = document.createElement("div");
     row.className = "tree-row" + (isActiveNode(area, path) ? " active":"");
     row.style.paddingLeft = (8 + depth*2) + "px";
+    row.dataset.area = area;
+    row.dataset.path = JSON.stringify(path);
 
     var caretSpan = '<span class="caret'+(hasChildren?"":" hidden-caret")+'" data-caret="1"></span>';
-    row.innerHTML = caretSpan + '<span class="label"></span><span class="cnt">'+node.count+'</span>';
+    row.innerHTML = caretSpan + '<span class="label"></span><span class="cnt">'+node.count+'</span><button type="button" class="tree-rename-btn editor-only" title="Rinomina questa cartella"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>';
     row.querySelector(".label").textContent = label;
     if(hasChildren){
       row.querySelector(".caret").innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="6 9 12 15 18 9"/></svg>';
     }
+
+    var renameBtn = row.querySelector(".tree-rename-btn");
+    renameBtn.onclick = function(ev){
+      ev.stopPropagation();
+      startInlineRename(row, label, area, path);
+    };
 
     var childWrap = document.createElement("div");
     childWrap.className = "tree-children";
@@ -1015,7 +1191,11 @@
       }
       card.appendChild(body);
 
-      card.onclick = function(){ openModal(e.id, list.map(function(x){return x.id;})); };
+      card.onclick = function(){
+        if(card.dataset.justDragged) return;
+        openModal(e.id, list.map(function(x){return x.id;}));
+      };
+      startCardDragTracking(card, e);
 
       frag.appendChild(card);
     });
@@ -1047,6 +1227,14 @@
     var e = byId[state.modalList[idx]];
     document.getElementById("modalImg").src = e.img || "";
     document.getElementById("modalImg").style.display = e.img ? "block":"none";
+    var tagsEl = document.getElementById("modalTags");
+    tagsEl.innerHTML = "";
+    currentLocationsOf(e.id).forEach(function(loc){
+      var chip = document.createElement("span");
+      chip.className = "tag-chip";
+      chip.textContent = "#" + [loc.area].concat(loc.path||[]).join(" / ");
+      tagsEl.appendChild(chip);
+    });
     var crumbs = [e.area].concat(e.path).join(" / ");
     document.getElementById("modalCrumbs").textContent = crumbs;
     document.getElementById("modalNomeInput").value = e.nome || "";
@@ -1145,18 +1333,11 @@
   var isEditor = false;
   var overridesDocRef = (typeof FIREBASE_ENABLED !== "undefined" && FIREBASE_ENABLED) ? firebase.firestore().collection("overrides").doc("catalog") : null;
 
-  function setEditorUI(on){
-    isEditor = on;
-    document.body.classList.toggle("is-editor", on);
-    var lockBtn = document.getElementById("editorLockBtn");
-    lockBtn.classList.toggle("on", on);
-    lockBtn.title = on ? "Modalita' editor attiva (clicca per uscire)" : "Modalita' editor: elimina, aggiungi e sposta esercizi";
-  }
-
   function computeEffectiveList(){
     var deleted = {};
     (FIRESTORE_OVERRIDES.deletedIds || []).forEach(function(id){ deleted[String(id)] = true; });
-    var moves = FIRESTORE_OVERRIDES.moves || {};
+    var foldersOverride = FIRESTORE_OVERRIDES.folders || {};
+    var legacyMoves = FIRESTORE_OVERRIDES.moves || {};
     var renames = FIRESTORE_OVERRIDES.treeRenames || {};
 
     function applyRename(area, path){
@@ -1172,25 +1353,61 @@
       return {area: outArea, path: outPath};
     }
 
+    // Restituisce l'elenco di posizioni (una o piu') in cui un esercizio compare.
+    // Se e' stato assegnato esplicitamente a una o piu' cartelle dalla modalita'
+    // editor, quelle vincono su tutto; altrimenti si usa la posizione originale
+    // (o lo spostamento singolo "moves", mantenuto solo per compatibilita' con
+    // dati salvati prima dell'introduzione delle cartelle multiple).
+    function locationsFor(id, baseArea, basePath){
+      if(foldersOverride[id] && foldersOverride[id].length){
+        return foldersOverride[id];
+      }
+      if(legacyMoves[id]){
+        return [legacyMoves[id]];
+      }
+      return [{area: baseArea, path: basePath}];
+    }
+
     var list = [];
     BASE_EXERCISES.forEach(function(e){
       if(deleted[String(e.id)]) return;
-      var area = e.area, path = e.path;
-      var mv = moves[e.id];
-      if(mv){ area = mv.area; path = mv.path; }
-      var r = applyRename(area, path);
-      var copy = {}; for(var k in e){ copy[k] = e[k]; }
-      copy.area = r.area; copy.path = r.path;
-      list.push(copy);
+      locationsFor(e.id, e.area, e.path).forEach(function(loc){
+        var r = applyRename(loc.area, loc.path || []);
+        var copy = {}; for(var k in e){ copy[k] = e[k]; }
+        copy.area = r.area; copy.path = r.path;
+        list.push(copy);
+      });
     });
     (FIRESTORE_OVERRIDES.customExercises || []).forEach(function(ce){
       if(deleted[String(ce.id)]) return;
-      var r = applyRename(ce.area, ce.path || []);
-      var copy = {}; for(var k in ce){ copy[k] = ce[k]; }
-      copy.area = r.area; copy.path = r.path;
-      list.push(copy);
+      locationsFor(ce.id, ce.area, ce.path || []).forEach(function(loc){
+        var r = applyRename(loc.area, loc.path || []);
+        var copy = {}; for(var k in ce){ copy[k] = ce[k]; }
+        copy.area = r.area; copy.path = r.path;
+        list.push(copy);
+      });
     });
     return list;
+  }
+
+  // Restituisce le posizioni ATTUALI (area+percorso) in cui l'esercizio compare,
+  // cosi' come risultano nella lista effettiva gia' calcolata (comoda per
+  // precompilare le spunte nella finestra "Cartelle").
+  function currentLocationsOf(id){
+    return CURRENT_EXERCISES.filter(function(e){ return e.id === id; })
+      .map(function(e){ return {area: e.area, path: e.path}; });
+  }
+
+  // Aggiunge (senza rimuovere le altre) una cartella all'insieme di posizioni
+  // di un esercizio — usato dal trascinamento rapido sull'albero.
+  function addExerciseToFolder(id, area, path){
+    var current = currentLocationsOf(id);
+    var already = current.some(function(l){ return l.area === area && (l.path||[]).join("/") === (path||[]).join("/"); });
+    if(already) return Promise.resolve("already");
+    var updated = current.concat([{area: area, path: path}]);
+    var foldersMap = {}; for(var k in (FIRESTORE_OVERRIDES.folders||{})) foldersMap[k] = FIRESTORE_OVERRIDES.folders[k];
+    foldersMap[id] = updated;
+    return saveOverridesToFirestore({folders: foldersMap});
   }
 
   function rebuildAll(){
@@ -1218,7 +1435,88 @@
     return overridesDocRef.set(patch, {merge: true});
   }
 
-  if(overridesDocRef){
+  // ---------- CRONOLOGIA MODIFICHE (firmata con nome di chi agisce) ----------
+  var currentEditorName = "";
+  var currentUserEmail = "";
+  function logAction(action, detail){
+    if(!FIREBASE_ENABLED) return;
+    try{
+      firebase.firestore().collection("log").add({
+        ts: firebase.firestore.FieldValue.serverTimestamp(),
+        action: action,
+        detail: detail || "",
+        actorName: currentEditorName || currentUserEmail || "sconosciuto",
+        actorEmail: currentUserEmail || ""
+      }).catch(function(err){ console.error("Log non salvato:", err); });
+    }catch(e){}
+  }
+  function renderLog(){
+    var body = document.getElementById("logBody");
+    body.innerHTML = '<div class="lib-empty">Caricamento...</div>';
+    firebase.firestore().collection("log").orderBy("ts", "desc").limit(200).get().then(function(snap){
+      body.innerHTML = "";
+      if(snap.empty){
+        body.innerHTML = '<div class="lib-empty">Nessuna modifica registrata finora.</div>';
+        return;
+      }
+      snap.forEach(function(doc){
+        var d = doc.data();
+        var row = document.createElement("div");
+        row.className = "log-row";
+        var when = d.ts && d.ts.toDate ? d.ts.toDate().toLocaleString("it-IT") : "";
+        row.innerHTML = '<div class="log-when">'+escapeHtml(when)+'</div>' +
+          '<div class="log-who">'+escapeHtml(d.actorName||"")+'</div>' +
+          '<div class="log-what"><b>'+escapeHtml(d.action||"")+'</b>'+(d.detail ? " — "+escapeHtml(d.detail) : "")+'</div>';
+        body.appendChild(row);
+      });
+    }).catch(function(err){
+      body.innerHTML = '<div class="lib-empty">Non sono riuscito a caricare la cronologia: '+escapeHtml(err.message)+'</div>';
+    });
+  }
+  document.getElementById("openLogBtn").onclick = function(){
+    document.getElementById("logOverlay").classList.add("open");
+    renderLog();
+  };
+  document.getElementById("logClose").onclick = function(){
+    document.getElementById("logOverlay").classList.remove("open");
+  };
+  document.getElementById("logOverlay").addEventListener("click", function(ev){ if(ev.target===this) this.classList.remove("open"); });
+
+  // ---------- GATE DI ACCESSO OBBLIGATORIO + RUOLI ----------
+  // L'intera app resta nascosta dietro una schermata di accesso finche' non
+  // si effettua il login con un account creato in precedenza in Firebase
+  // (Authentication -> Utenti): questo limita la visione dell'app a persone
+  // pre-autorizzate. Tra chi ha fatto login, solo chi ha un documento
+  // roles/{uid} con role:"editor" (creato a mano dalla Console Firebase,
+  // MAI dall'app stessa, per sicurezza) vede anche gli strumenti di modifica
+  // del catalogo. Vedi FIREBASE_SETUP.md per i dettagli e i limiti di questa
+  // protezione (non e' una protezione assoluta: chi conosce gli indirizzi
+  // diretti dei file puo' comunque scaricarli, login o no).
+  function showGate(msg){
+    document.getElementById("gateOverlay").classList.add("open");
+    document.getElementById("gateError").textContent = msg || "";
+  }
+  function hideGate(){
+    document.getElementById("gateOverlay").classList.remove("open");
+  }
+  document.getElementById("gateSubmitBtn").onclick = function(){
+    var email = document.getElementById("gateEmail").value.trim();
+    var pwd = document.getElementById("gatePassword").value;
+    var errEl = document.getElementById("gateError");
+    errEl.textContent = "Accesso in corso...";
+    firebase.auth().signInWithEmailAndPassword(email, pwd).catch(function(err){
+      errEl.textContent = "Accesso non riuscito: email o password errate.";
+    });
+  };
+  document.getElementById("gatePassword").addEventListener("keydown", function(ev){
+    if(ev.key === "Enter") document.getElementById("gateSubmitBtn").click();
+  });
+  document.getElementById("accountLogoutBtn").onclick = function(){
+    if(confirm("Uscire dall'app?")) firebase.auth().signOut();
+  };
+
+  if(FIREBASE_ENABLED && !SHARED_MODE){
+    showGate();
     overridesDocRef.onSnapshot(function(doc){
       var data = doc.exists ? doc.data() : {};
       FIRESTORE_OVERRIDES = {
@@ -1234,39 +1532,33 @@
     });
 
     firebase.auth().onAuthStateChanged(function(user){
-      setEditorUI(!!user);
+      if(!user){
+        isEditor = false;
+        currentEditorName = ""; currentUserEmail = "";
+        document.body.classList.remove("is-editor");
+        document.getElementById("accountBadge").style.display = "none";
+        showGate();
+        return;
+      }
+      currentUserEmail = user.email || "";
+      hideGate();
+      loadTemplatesFromFirestore();
+      firebase.firestore().collection("roles").doc(user.uid).get().then(function(doc){
+        var data = doc.exists ? doc.data() : {};
+        isEditor = data.role === "editor";
+        currentEditorName = data.name || user.email || "";
+        document.body.classList.toggle("is-editor", isEditor);
+        var badge = document.getElementById("accountBadge");
+        badge.style.display = "flex";
+        document.getElementById("accountName").textContent = currentEditorName + (isEditor ? " (editor)" : "");
+      }).catch(function(){
+        isEditor = false;
+        currentEditorName = user.email || "";
+        document.getElementById("accountBadge").style.display = "flex";
+        document.getElementById("accountName").textContent = currentEditorName;
+      });
     });
   }
-
-  // ---------- LOGIN / LOGOUT MODALITA' EDITOR ----------
-  document.getElementById("editorLockBtn").onclick = function(){
-    if(!overridesDocRef){
-      alert("La modalita' editor non e' ancora configurata su questo sito (manca firebase-config.js). Vedi FIREBASE_SETUP.md.");
-      return;
-    }
-    if(isEditor){
-      if(confirm("Uscire dalla modalita' editor?")) firebase.auth().signOut();
-      return;
-    }
-    document.getElementById("loginEmail").value = "";
-    document.getElementById("loginPassword").value = "";
-    document.getElementById("loginError").textContent = "";
-    document.getElementById("loginOverlay").classList.add("open");
-  };
-  document.getElementById("loginCancelBtn").onclick = function(){
-    document.getElementById("loginOverlay").classList.remove("open");
-  };
-  document.getElementById("loginSubmitBtn").onclick = function(){
-    var email = document.getElementById("loginEmail").value.trim();
-    var pwd = document.getElementById("loginPassword").value;
-    var errEl = document.getElementById("loginError");
-    errEl.textContent = "";
-    firebase.auth().signInWithEmailAndPassword(email, pwd).then(function(){
-      document.getElementById("loginOverlay").classList.remove("open");
-    }).catch(function(err){
-      errEl.textContent = "Accesso non riuscito: email o password errate.";
-    });
-  };
 
   // ---------- ELIMINA ESERCIZIO ----------
   document.getElementById("modalDeleteBtn").onclick = function(){
@@ -1292,27 +1584,71 @@
     });
   };
 
-  // ---------- SPOSTA ESERCIZIO ----------
+  // ---------- CARTELLE ESERCIZIO (appartenenza multipla, a spunte) ----------
+  function flattenTreeForChecklist(){
+    var flat = [];
+    Object.keys(TREE).sort().forEach(function(area){
+      flat.push({area: area, path: [], label: area, depth: 0, count: TREE[area].count});
+      (function walk(node, path, depth){
+        Object.keys(node.children).sort().forEach(function(seg){
+          var fullPath = path.concat([seg]);
+          flat.push({area: area, path: fullPath, label: seg, depth: depth, count: node.children[seg].count});
+          walk(node.children[seg], fullPath, depth+1);
+        });
+      })(TREE[area], [], 1);
+    });
+    return flat;
+  }
+  function sameLoc(a, b){
+    return a.area === b.area && (a.path||[]).join("/") === (b.path||[]).join("/");
+  }
   document.getElementById("modalMoveBtn").onclick = function(){
     var id = state.modalList[state.modalIndex];
     var e = byId[id];
     if(!e) return;
-    document.getElementById("moveExArea").value = e.area || "";
-    document.getElementById("moveExPath").value = (e.path||[]).join("/");
-    document.getElementById("moveExerciseError").textContent = "";
-    document.getElementById("moveExerciseOverlay").classList.add("open");
-    document.getElementById("moveExerciseOverlay").dataset.exId = id;
+    var current = currentLocationsOf(id);
+    var list = flattenTreeForChecklist();
+    var container = document.getElementById("folderCheckList");
+    container.innerHTML = "";
+    list.forEach(function(node){
+      var row = document.createElement("label");
+      row.className = "folder-check-row";
+      row.style.paddingLeft = (node.depth * 16) + "px";
+      var cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = current.some(function(l){ return sameLoc(l, node); });
+      cb.dataset.area = node.area;
+      cb.dataset.path = JSON.stringify(node.path);
+      row.appendChild(cb);
+      var lbl = document.createElement("span");
+      lbl.textContent = node.depth===0 ? node.label : node.label;
+      row.appendChild(lbl);
+      var cnt = document.createElement("span");
+      cnt.className = "fc-count"; cnt.textContent = node.count + (node.count===1?" esercizio":" esercizi");
+      row.appendChild(cnt);
+      container.appendChild(row);
+    });
+    document.getElementById("newFolderInline").value = "";
+    document.getElementById("foldersError").textContent = "";
+    document.getElementById("foldersOverlay").classList.add("open");
+    document.getElementById("foldersOverlay").dataset.exId = id;
   };
-  document.getElementById("moveExerciseCancelBtn").onclick = function(){
-    document.getElementById("moveExerciseOverlay").classList.remove("open");
+  document.getElementById("foldersCancelBtn").onclick = function(){
+    document.getElementById("foldersOverlay").classList.remove("open");
   };
-  document.getElementById("moveExerciseSubmitBtn").onclick = function(){
-    var id = document.getElementById("moveExerciseOverlay").dataset.exId;
-    var area = document.getElementById("moveExArea").value.trim();
-    var path = document.getElementById("moveExPath").value.trim();
-    var errEl = document.getElementById("moveExerciseError");
-    if(!area){ errEl.textContent = "Indica almeno l'area."; return; }
-    var pathArr = path ? path.split("/").map(function(s){return s.trim();}).filter(Boolean) : [];
+  document.getElementById("foldersSubmitBtn").onclick = function(){
+    var id = document.getElementById("foldersOverlay").dataset.exId;
+    var errEl = document.getElementById("foldersError");
+    var checked = Array.prototype.slice.call(document.querySelectorAll("#folderCheckList input[type=checkbox]:checked"))
+      .map(function(cb){ return {area: cb.dataset.area, path: JSON.parse(cb.dataset.path)}; });
+    var newFolderTxt = document.getElementById("newFolderInline").value.trim();
+    if(newFolderTxt){
+      var segs = newFolderTxt.split("/").map(function(s){return s.trim();}).filter(Boolean);
+      if(segs.length){
+        checked.push({area: segs[0], path: segs.slice(1)});
+      }
+    }
+    if(checked.length===0){ errEl.textContent = "Seleziona almeno una cartella (o aggiungine una nuova)."; return; }
 
     var isCustom = (FIRESTORE_OVERRIDES.customExercises||[]).some(function(c){ return c.id === id; });
     var patch = {};
@@ -1320,21 +1656,93 @@
       patch.customExercises = (FIRESTORE_OVERRIDES.customExercises||[]).map(function(c){
         if(c.id !== id) return c;
         var copy = {}; for(var k in c){ copy[k] = c[k]; }
-        copy.area = area; copy.path = pathArr;
+        copy.area = checked[0].area; copy.path = checked[0].path;
         return copy;
       });
+      if(checked.length > 1){
+        var foldersMap1 = {}; for(var k in (FIRESTORE_OVERRIDES.folders||{})) foldersMap1[k] = FIRESTORE_OVERRIDES.folders[k];
+        foldersMap1[id] = checked;
+        patch.folders = foldersMap1;
+      }
     } else {
-      var moves = {}; for(var k in (FIRESTORE_OVERRIDES.moves||{})) moves[k] = FIRESTORE_OVERRIDES.moves[k];
-      moves[id] = {area: area, path: pathArr};
-      patch.moves = moves;
+      var foldersMap = {}; for(var k2 in (FIRESTORE_OVERRIDES.folders||{})) foldersMap[k2] = FIRESTORE_OVERRIDES.folders[k2];
+      foldersMap[id] = checked;
+      patch.folders = foldersMap;
     }
     saveOverridesToFirestore(patch).then(function(){
-      document.getElementById("moveExerciseOverlay").classList.remove("open");
+      document.getElementById("foldersOverlay").classList.remove("open");
       closeModal();
     }).catch(function(err){
-      errEl.textContent = "Non sono riuscito a spostare l'esercizio: " + err.message;
+      errEl.textContent = "Non sono riuscito a salvare: " + err.message;
     });
   };
+
+  // ---------- TRASCINAMENTO ESERCIZIO SU CARTELLA (mouse e tocco) ----------
+  var dragState = null;
+  var DRAG_THRESHOLD = 10;
+
+  function startCardDragTracking(card, exercise){
+    card.addEventListener("pointerdown", function(ev){
+      if(!isEditor) return;
+      if(ev.button !== undefined && ev.button !== 0 && ev.pointerType === "mouse") return;
+      dragState = {
+        id: exercise.id, nome: exercise.nome, startX: ev.clientX, startY: ev.clientY,
+        active: false, ghost: null, lastRow: null, pointerId: ev.pointerId
+      };
+      function onMove(mv){
+        if(!dragState) return;
+        var dx = mv.clientX - dragState.startX, dy = mv.clientY - dragState.startY;
+        if(!dragState.active){
+          if(Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
+          dragState.active = true;
+          var ghost = document.createElement("div");
+          ghost.className = "drag-ghost";
+          ghost.textContent = dragState.nome;
+          document.body.appendChild(ghost);
+          dragState.ghost = ghost;
+        }
+        mv.preventDefault();
+        dragState.ghost.style.left = mv.clientX + "px";
+        dragState.ghost.style.top = mv.clientY + "px";
+        var target = document.elementFromPoint(mv.clientX, mv.clientY);
+        var row = target ? target.closest(".tree-row") : null;
+        if(row && row.dataset.area === undefined) row = null;
+        if(dragState.lastRow && dragState.lastRow !== row) dragState.lastRow.classList.remove("drop-target");
+        if(row) row.classList.add("drop-target");
+        dragState.lastRow = row;
+      }
+      function onUp(up){
+        document.removeEventListener("pointermove", onMove);
+        document.removeEventListener("pointerup", onUp);
+        document.removeEventListener("pointercancel", onUp);
+        if(!dragState) return;
+        var wasActive = dragState.active;
+        if(dragState.ghost) dragState.ghost.remove();
+        if(dragState.lastRow){
+          dragState.lastRow.classList.remove("drop-target");
+          var area = dragState.lastRow.dataset.area;
+          var path = JSON.parse(dragState.lastRow.dataset.path || "[]");
+          addExerciseToFolder(dragState.id, area, path).then(function(res){
+            if(res !== "already"){
+              dragState.lastRow.classList.add("drop-flash");
+              setTimeout(function(){ if(dragState && dragState.lastRow) dragState.lastRow.classList.remove("drop-flash"); }, 650);
+            }
+          }).catch(function(err){
+            alert("Non sono riuscito ad aggiungere alla cartella: " + err.message);
+          });
+        }
+        if(wasActive){
+          // impedisce che il tap che ha concluso il trascinamento riapra anche il dettaglio
+          card.dataset.justDragged = "1";
+          setTimeout(function(){ delete card.dataset.justDragged; }, 50);
+        }
+        dragState = null;
+      }
+      document.addEventListener("pointermove", onMove);
+      document.addEventListener("pointerup", onUp);
+      document.addEventListener("pointercancel", onUp);
+    });
+  }
 
   // ---------- AGGIUNGI ESERCIZIO ----------
   function refreshAreaDatalist(){
@@ -1405,54 +1813,205 @@
     }
   };
 
-  // ---------- MODIFICA ALBERO ----------
-  function renderTreeEditList(){
-    var container = document.getElementById("treeEditList");
-    container.innerHTML = "";
-    Object.keys(TREE).sort().forEach(function(area){
-      addTreeEditRow(container, "Area", area, area, []);
-      addTreeEditChildren(container, area, TREE[area].children, []);
+  // ---------- MODELLI DI CARTA INTESTATA ----------
+  // Due modelli sono sempre disponibili (incorporati nella pagina): quello
+  // originale del Centro di Medicina e uno completamente bianco. Altri
+  // modelli, caricati dalla modalita' editor, vengono salvati su Firebase
+  // Storage (le immagini) + Firestore (l'elenco), cosi' sono visibili subito
+  // a chiunque apra l'app.
+  var TEMPLATES_CACHE = [];
+
+  function builtinTemplates(){
+    return [
+      {id: "__default__", nome: "Originale (Centro di Medicina)", headerUrl: lhHeaderSrc(), footerUrl: lhFooterSrc()},
+      {id: "__blank__", nome: "Bianco (senza intestazione)", headerUrl: "", footerUrl: ""}
+    ];
+  }
+  function allTemplates(){
+    return builtinTemplates().concat(TEMPLATES_CACHE);
+  }
+  function populateTemplateSelect(selectedId){
+    var sel = document.getElementById("fTemplate");
+    var prev = selectedId || sel.value || "__default__";
+    sel.innerHTML = "";
+    allTemplates().forEach(function(t){
+      var opt = document.createElement("option");
+      opt.value = t.id; opt.textContent = t.nome;
+      sel.appendChild(opt);
+    });
+    sel.value = prev;
+    if(sel.selectedIndex < 0) sel.value = "__default__";
+  }
+  function templateById(id){
+    return allTemplates().filter(function(t){ return t.id === id; })[0] || builtinTemplates()[0];
+  }
+  function loadTemplatesFromFirestore(){
+    if(!FIREBASE_ENABLED) return;
+    firebase.firestore().collection("templates").orderBy("createdAt", "asc").get().then(function(snap){
+      TEMPLATES_CACHE = [];
+      snap.forEach(function(doc){
+        var d = doc.data();
+        TEMPLATES_CACHE.push({id: doc.id, nome: d.nome, headerUrl: d.headerUrl || "", footerUrl: d.footerUrl || ""});
+      });
+      populateTemplateSelect();
+      if(document.getElementById("templatesOverlay").classList.contains("open")) renderTemplatesList();
+    }).catch(function(err){ console.error("Errore caricamento modelli:", err); });
+  }
+
+  function renderTemplatesList(){
+    var box = document.getElementById("templatesList");
+    box.innerHTML = "";
+    allTemplates().forEach(function(t){
+      var row = document.createElement("div");
+      row.className = "lib-card";
+      var info = document.createElement("div");
+      info.className = "lc-info";
+      info.innerHTML = '<div class="lc-name"></div><div class="lc-meta">' + (t.id.indexOf("__")===0 ? "Modello predefinito" : "Modello personalizzato") + '</div>';
+      info.querySelector(".lc-name").textContent = t.nome;
+      row.appendChild(info);
+      if(t.id.indexOf("__") !== 0){
+        var actions = document.createElement("div");
+        actions.className = "lc-actions";
+        var del = document.createElement("button");
+        del.className = "btn danger"; del.textContent = "Elimina";
+        del.onclick = function(){
+          if(!confirm('Eliminare il modello "'+t.nome+'"?')) return;
+          firebase.firestore().collection("templates").doc(t.id).delete().then(function(){
+            logAction("Eliminato modello carta intestata", t.nome);
+            loadTemplatesFromFirestore();
+          }).catch(function(err){ alert("Errore: " + err.message); });
+        };
+        actions.appendChild(del);
+        row.appendChild(actions);
+      }
+      box.appendChild(row);
     });
   }
-  function addTreeEditChildren(container, area, children, parentPath){
-    Object.keys(children).sort().forEach(function(seg){
-      var fullPath = parentPath.concat([seg]);
-      addTreeEditRow(container, "Cartella", fullPath.join(" / "), seg, fullPath, area);
-      addTreeEditChildren(container, area, children[seg].children, fullPath);
+
+  function fileToDataUrl(file){
+    return new Promise(function(resolve, reject){
+      var reader = new FileReader();
+      reader.onload = function(){ resolve(reader.result); };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
     });
   }
-  function addTreeEditRow(container, kind, displayLabel, currentSeg, path, area){
-    var row = document.createElement("div");
-    row.className = "tree-edit-row";
-    var lbl = document.createElement("span");
-    lbl.className = "tr-label"; lbl.textContent = kind;
-    row.appendChild(lbl);
+
+  document.getElementById("manageTemplatesBtn").onclick = function(){
+    if(!isEditor) return;
+    document.getElementById("newTplNome").value = "";
+    document.getElementById("newTplHeader").value = "";
+    document.getElementById("newTplFooter").value = "";
+    document.getElementById("templatesError").textContent = "";
+    renderTemplatesList();
+    document.getElementById("templatesOverlay").classList.add("open");
+  };
+  document.getElementById("templatesClose").onclick = function(){
+    document.getElementById("templatesOverlay").classList.remove("open");
+  };
+  function resizeImageToDataUrlPromise(file, maxSize){
+    return new Promise(function(resolve){
+      var reader = new FileReader();
+      reader.onload = function(ev){
+        var img = new Image();
+        img.onload = function(){
+          var w = img.width, h = img.height;
+          if(w > maxSize){ h = Math.round(h * maxSize / w); w = maxSize; }
+          var canvas = document.createElement("canvas");
+          canvas.width = w; canvas.height = h;
+          canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+          // PNG, non JPEG: mantiene lo sfondo trasparente dei loghi
+          resolve(canvas.toDataURL("image/png"));
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+  document.getElementById("uploadTplBtn").onclick = async function(){
+    var nome = document.getElementById("newTplNome").value.trim();
+    var headerFile = document.getElementById("newTplHeader").files[0];
+    var footerFile = document.getElementById("newTplFooter").files[0];
+    var errEl = document.getElementById("templatesError");
+    if(!nome){ errEl.textContent = "Dai un nome al modello."; return; }
+    var btn = document.getElementById("uploadTplBtn");
+    btn.disabled = true;
+    errEl.textContent = "Caricamento in corso...";
+    try{
+      var templateId = "t_" + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+      // Le immagini vengono ridotte e salvate direttamente dentro Firestore
+      // (come base64): niente Firebase Storage, quindi niente bisogno del
+      // piano a pagamento "Blaze" -- restiamo sul piano gratuito "Spark".
+      var headerUrl = headerFile ? await resizeImageToDataUrlPromise(headerFile, 900) : "";
+      var footerUrl = footerFile ? await resizeImageToDataUrlPromise(footerFile, 900) : "";
+      var totalKB = (headerUrl.length + footerUrl.length) / 1024;
+      if(totalKB > 850){
+        errEl.textContent = "Le immagini sono troppo pesanti (" + Math.round(totalKB) + "KB, il limite e' circa 850KB). Prova con foto piu' semplici o di dimensioni piu' piccole.";
+        btn.disabled = false;
+        return;
+      }
+      await firebase.firestore().collection("templates").doc(templateId).set({
+        nome: nome, headerUrl: headerUrl, footerUrl: footerUrl,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      logAction("Nuovo modello carta intestata", nome);
+      errEl.textContent = "";
+      document.getElementById("newTplNome").value = "";
+      document.getElementById("newTplHeader").value = "";
+      document.getElementById("newTplFooter").value = "";
+      loadTemplatesFromFirestore();
+    }catch(err){
+      errEl.textContent = "Errore durante il caricamento: " + err.message;
+    }finally{
+      btn.disabled = false;
+    }
+  };
+
+  // ---------- RINOMINA SUL POSTO (direttamente nell'albero a sinistra) ----------
+  function startInlineRename(row, currentLabel, area, path){
+    if(row.querySelector(".tree-rename-input")) return; // gia' in modifica
+    var labelSpan = row.querySelector(".label");
+    var oldDisplay = labelSpan.style.display;
+    labelSpan.style.display = "none";
     var input = document.createElement("input");
     input.type = "text";
-    input.value = displayLabel;
-    row.appendChild(input);
-    var btn = document.createElement("button");
-    btn.className = "btn"; btn.textContent = "Rinomina";
-    btn.onclick = function(){
+    input.className = "tree-rename-input";
+    input.value = currentLabel;
+    labelSpan.insertAdjacentElement("afterend", input);
+    input.focus();
+    input.select();
+
+    var done = false;
+    function commit(save){
+      if(done) return;
+      done = true;
+      input.remove();
+      labelSpan.style.display = oldDisplay;
       var newLabel = input.value.trim();
-      if(!newLabel || newLabel === displayLabel) return;
-      var renames = {}; for(var k in (FIRESTORE_OVERRIDES.treeRenames||{})) renames[k] = FIRESTORE_OVERRIDES.treeRenames[k];
-      var key = kind === "Area" ? ("A::" + currentSeg) : ("P::" + area + "::" + path.join("/"));
-      renames[key] = newLabel;
-      saveOverridesToFirestore({treeRenames: renames}).then(function(){
-        document.getElementById("editTreeError").textContent = "";
-        renderTreeEditList();
-      }).catch(function(err){
-        document.getElementById("editTreeError").textContent = "Errore: " + err.message;
-      });
-    };
-    row.appendChild(btn);
-    container.appendChild(row);
+      if(save && newLabel && newLabel !== currentLabel){
+        var renames = {}; for(var k in (FIRESTORE_OVERRIDES.treeRenames||{})) renames[k] = FIRESTORE_OVERRIDES.treeRenames[k];
+        var key = path.length===0 ? ("A::" + area) : ("P::" + area + "::" + path.join("/"));
+        renames[key] = newLabel;
+        saveOverridesToFirestore({treeRenames: renames}).then(function(){
+          logAction("Rinomina cartella", '"' + currentLabel + '" \u2192 "' + newLabel + '"');
+        }).catch(function(err){
+          alert("Non sono riuscito a rinominare: " + err.message);
+        });
+      }
+    }
+    input.addEventListener("keydown", function(ev){
+      ev.stopPropagation();
+      if(ev.key === "Enter") commit(true);
+      if(ev.key === "Escape") commit(false);
+    });
+    input.addEventListener("click", function(ev){ ev.stopPropagation(); });
+    input.addEventListener("blur", function(){ commit(true); });
   }
+
+  // ---------- NUOVA CARTELLA VUOTA ----------
   document.getElementById("editTreeBtn").onclick = function(){
     if(!isEditor) return;
     refreshAreaDatalist();
-    renderTreeEditList();
     document.getElementById("newFolderArea").value = "";
     document.getElementById("newFolderPath").value = "";
     document.getElementById("editTreeError").textContent = "";
@@ -1470,10 +2029,11 @@
     var folders = (FIRESTORE_OVERRIDES.customFolders || []).slice();
     folders.push({area: area, path: pathArr});
     saveOverridesToFirestore({customFolders: folders}).then(function(){
+      logAction("Nuova cartella", [area].concat(pathArr).join(" / "));
       document.getElementById("newFolderArea").value = "";
       document.getElementById("newFolderPath").value = "";
       errEl.textContent = "";
-      renderTreeEditList();
+      document.getElementById("editTreeOverlay").classList.remove("open");
     }).catch(function(err){
       errEl.textContent = "Errore: " + err.message;
     });
@@ -1547,6 +2107,10 @@
   fData.oninput = function(){ saveField("raccolta_esercizi_data", fData.value); };
   fNote.oninput = function(){ saveField("raccolta_esercizi_note", fNote.value); };
 
+  var fTemplate = document.getElementById("fTemplate");
+  populateTemplateSelect(loadField("raccolta_esercizi_template", "__default__"));
+  fTemplate.onchange = function(){ saveField("raccolta_esercizi_template", fTemplate.value); };
+
   // ---------- FOGLI A4 (anteprima, stampa e file scaricato) ----------
   // Le proporzioni dell'intestazione e del piede pagina (altezza/larghezza)
   // vengono dalle immagini PNG originali della carta intestata: servono per
@@ -1597,8 +2161,8 @@
     var contentWCm = 21 - 2*2; // 17cm: larghezza foglio meno margini laterali (2cm ciascuno)
     var contentWPx = cmToPx(contentWCm);
     var pageInnerHPx = cmToPx(29.7 - 2*1); // altezza utile: meno margini sopra/sotto (1cm ciascuno)
-    var headerHPx = cmToPx(contentWCm * LH_HEADER_RATIO) + cmToPx(0.5);
-    var footerHPx = cmToPx(contentWCm * LH_FOOTER_RATIO) + cmToPx(0.5);
+    var headerHPx = headerSrc ? (cmToPx(contentWCm * LH_HEADER_RATIO) + cmToPx(0.5)) : 0;
+    var footerHPx = footerSrc ? (cmToPx(contentWCm * LH_FOOTER_RATIO) + cmToPx(0.5)) : 0;
     // margine di sicurezza piu' ampio: evita che piccole differenze tra il
     // calcolo a schermo e la resa in stampa creino una pagina aggiuntiva
     // quasi vuota per un trabocco di pochi millimetri
@@ -1654,11 +2218,13 @@
       var sheet = document.createElement("div");
       sheet.className = "a4-sheet";
 
-      var headerImg = document.createElement("img");
-      headerImg.className = "a4-header";
-      headerImg.src = headerSrc;
-      headerImg.alt = "Centro di medicina";
-      sheet.appendChild(headerImg);
+      if(headerSrc){
+        var headerImg = document.createElement("img");
+        headerImg.className = "a4-header";
+        headerImg.src = headerSrc;
+        headerImg.alt = "";
+        sheet.appendChild(headerImg);
+      }
 
       var body = document.createElement("div");
       body.className = "a4-body";
@@ -1675,11 +2241,13 @@
         sheet.appendChild(pageNum);
       }
 
-      var footerImg = document.createElement("img");
-      footerImg.className = "a4-footer";
-      footerImg.src = footerSrc;
-      footerImg.alt = "";
-      sheet.appendChild(footerImg);
+      if(footerSrc){
+        var footerImg = document.createElement("img");
+        footerImg.className = "a4-footer";
+        footerImg.src = footerSrc;
+        footerImg.alt = "";
+        sheet.appendChild(footerImg);
+      }
 
       container.appendChild(sheet);
     });
@@ -1698,13 +2266,17 @@
     }).filter(Boolean);
   }
 
+  var originalDocTitle = document.title;
   function printCurrentScheda(){
+    var tpl = templateById(fTemplate.value);
     buildA4Sheets(
-      document.getElementById("printPages"), lhHeaderSrc(), lhFooterSrc(),
+      document.getElementById("printPages"), tpl.headerUrl, tpl.footerUrl,
       fPaziente.value, fData.value || new Date().toLocaleDateString("it-IT"),
       fNote.value, currentItemsForPrint()
     );
+    document.title = schedaFilename(fPaziente.value).replace(/\.html$/, "");
     window.print();
+    setTimeout(function(){ document.title = originalDocTitle; }, 1000);
   }
 
   document.getElementById("printSchedaBtn").onclick = function(){
@@ -1728,12 +2300,14 @@
     document.getElementById("previewOverlay").classList.remove("open");
   };
   document.getElementById("previewPrintBtn").onclick = function(){
+    document.getElementById("previewOverlay").classList.remove("open");
     printCurrentScheda();
   };
 
   function buildPreview(){
+    var tpl = templateById(fTemplate.value);
     buildA4Sheets(
-      document.getElementById("previewPages"), lhHeaderSrc(), lhFooterSrc(),
+      document.getElementById("previewPages"), tpl.headerUrl, tpl.footerUrl,
       fPaziente.value, fData.value || new Date().toLocaleDateString("it-IT"),
       fNote.value, currentItemsForPrint()
     );
@@ -1756,6 +2330,16 @@
     s = (s || "").normalize("NFKD").replace(/[̀-ͯ]/g, "");
     s = s.replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_+|_+$/g, "");
     return s || "senza_nome";
+  }
+  // Come slugify, ma per i nomi file pensati per essere letti da una persona:
+  // mantiene spazi, maiuscole e accenti, toglie solo i caratteri non ammessi
+  // nei nomi file (di Windows/macOS) e gli spazi superflui.
+  function safeFilenamePart(s){
+    s = (s || "").replace(/[\/\\:*?"<>|]/g, "").trim();
+    return s || "Senza nome";
+  }
+  function schedaFilename(paziente){
+    return "Scheda esercizi_" + safeFilenamePart(paziente) + ".html";
   }
 
   // IMG_DATA e' dichiarato con "const" nel file caricato dinamicamente: questo
@@ -1793,9 +2377,29 @@
   // A4 dell'app (buildA4Sheets) incorporandola come script inline: cosi',
   // quando lo si apre, si ricompone da solo in fogli 21x29.7cm -- stesso
   // formato dell'anteprima e della stampa, sia a schermo che stampandolo.
+  // Converte in base64 un URL remoto (es. immagine di un modello caricato su
+  // Firebase Storage), cosi' il file esportato resta autonomo e apribile
+  // anche offline. Se il download fallisce (es. offline in quel momento),
+  // usa comunque l'URL originale come ripiego.
+  async function urlToDataUrl(url){
+    if(!url || url.indexOf("data:") === 0) return url;
+    try{
+      var resp = await fetch(url);
+      var blob = await resp.blob();
+      return await new Promise(function(resolve){
+        var reader = new FileReader();
+        reader.onload = function(){ resolve(reader.result); };
+        reader.onerror = function(){ resolve(url); };
+        reader.readAsDataURL(blob);
+      });
+    }catch(e){ return url; }
+  }
+
   async function buildStandaloneSchedaHTML(override){
-    var headerSrc = lhHeaderSrc();
-    var footerSrc = lhFooterSrc();
+    var templateId = (override && override.templateId) ? override.templateId : (fTemplate.value || "__default__");
+    var tpl = templateById(templateId);
+    var headerSrc = await urlToDataUrl(tpl.headerUrl);
+    var footerSrc = await urlToDataUrl(tpl.footerUrl);
     var paziente = (override && override.paziente !== undefined) ? override.paziente : (fPaziente.value || "");
     var dataVal = (override && override.dataVal) ? override.dataVal : (fData.value || new Date().toLocaleDateString("it-IT"));
     var note = (override && override.note !== undefined) ? override.note : (fNote.value || "");
@@ -1913,8 +2517,7 @@
     try{
       var html = await buildStandaloneSchedaHTML();
       var paziente = fPaziente.value || "";
-      var dataSlug = slugify(fData.value || new Date().toLocaleDateString("it-IT"));
-      var filename = "Scheda_" + slugify(paziente) + "_" + dataSlug + ".html";
+      var filename = schedaFilename(paziente);
 
       if(window.showSaveFilePicker){
         try{
@@ -1993,7 +2596,8 @@
       paziente: fPaziente.value || "",
       dataVal: fData.value || new Date().toLocaleDateString("it-IT"),
       note: fNote.value || "",
-      ids: Array.from(state.selected)
+      ids: Array.from(state.selected),
+      templateId: fTemplate.value || "__default__"
     };
   }
 
@@ -2010,7 +2614,7 @@
     var list = loadLibrary();
     list.unshift({
       id: uid(), nome: nome, paziente: cur.paziente, dataVal: cur.dataVal,
-      note: cur.note, ids: cur.ids, createdAt: Date.now()
+      note: cur.note, ids: cur.ids, templateId: cur.templateId, createdAt: Date.now()
     });
     saveLibrary(list);
     var statusEl = document.getElementById("saveStatus");
@@ -2061,6 +2665,8 @@
         saveField("raccolta_esercizi_paziente", fPaziente.value);
         saveField("raccolta_esercizi_data", fData.value);
         saveField("raccolta_esercizi_note", fNote.value);
+        populateTemplateSelect(s.templateId || "__default__");
+        saveField("raccolta_esercizi_template", fTemplate.value);
         state.selected = new Set(s.ids||[]);
         saveSelected(); updateSchedaCount(); renderDrawer(); renderGrid();
         closeLibrary();
@@ -2078,8 +2684,8 @@
       fileBtn.onclick = async function(){
         fileBtn.disabled = true;
         try{
-          var html = await buildStandaloneSchedaHTML({paziente:s.paziente, dataVal:s.dataVal, note:s.note, ids:s.ids});
-          var filename = "Scheda_" + slugify(s.paziente) + "_" + slugify(s.dataVal) + ".html";
+          var html = await buildStandaloneSchedaHTML({paziente:s.paziente, dataVal:s.dataVal, note:s.note, ids:s.ids, templateId:s.templateId});
+          var filename = schedaFilename(s.paziente);
           downloadFallback(html, filename);
         }catch(e){
           alert("Non sono riuscito a generare il file: " + (e && e.message ? e.message : e));
@@ -2128,7 +2734,7 @@
     }).join(""));
   }
   function encodeSchedaForLink(s){
-    var payload = {n: s.nome||"", p: s.paziente||"", d: s.dataVal||"", no: s.note||"", i: s.ids||[]};
+    var payload = {n: s.nome||"", p: s.paziente||"", d: s.dataVal||"", no: s.note||"", i: s.ids||[], t: s.templateId||"__default__"};
     return b64EncodeUnicode(JSON.stringify(payload));
   }
   function decodeSchedaFromLink(code){
@@ -2139,7 +2745,8 @@
         paziente: payload.p || "",
         dataVal: payload.d || "",
         note: payload.no || "",
-        ids: Array.isArray(payload.i) ? payload.i : []
+        ids: Array.isArray(payload.i) ? payload.i : [],
+        templateId: payload.t || "__default__"
       };
     }catch(e){ return null; }
   }
@@ -2160,7 +2767,7 @@
     openShareModal({
       nome: fPaziente.value ? (fPaziente.value + " - " + (fData.value||"")) : "Scheda",
       paziente: fPaziente.value, dataVal: fData.value, note: fNote.value,
-      ids: Array.from(state.selected)
+      ids: Array.from(state.selected), templateId: fTemplate.value || "__default__"
     });
   };
   document.getElementById("shareCloseBtn").onclick = function(){ document.getElementById("shareOverlay").classList.remove("open"); };
@@ -2198,8 +2805,9 @@
     if(!scheda || !scheda.ids || scheda.ids.length===0) return;
     pendingImport = scheda;
 
+    var tpl = templateById(scheda.templateId || "__default__");
     buildA4Sheets(
-      document.getElementById("previewPages"), lhHeaderSrc(), lhFooterSrc(),
+      document.getElementById("previewPages"), tpl.headerUrl, tpl.footerUrl,
       scheda.paziente, scheda.dataVal || new Date().toLocaleDateString("it-IT"),
       scheda.note, itemsForIds(scheda.ids)
     );
@@ -2222,12 +2830,14 @@
     saveField("raccolta_esercizi_paziente", fPaziente.value);
     saveField("raccolta_esercizi_data", fData.value);
     saveField("raccolta_esercizi_note", fNote.value);
+    populateTemplateSelect(s.templateId || "__default__");
+    saveField("raccolta_esercizi_template", fTemplate.value);
     state.selected = new Set(s.ids);
     saveSelected(); updateSchedaCount(); renderDrawer(); renderGrid();
     var list = loadLibrary();
     list.unshift({
       id: uid(), nome: s.nome || "Scheda condivisa", paziente: s.paziente, dataVal: s.dataVal,
-      note: s.note, ids: s.ids, createdAt: Date.now()
+      note: s.note, ids: s.ids, templateId: s.templateId, createdAt: Date.now()
     });
     saveLibrary(list);
     document.getElementById("importBanner").classList.remove("open");
@@ -2265,6 +2875,31 @@
     });
   }
 
+  // ---------- VISTA SCHEDA CONDIVISA (link diretto, senza login ne' resto app) ----------
+  function initSharedView(){
+    var h = location.hash || "";
+    var m = h.match(/#s=(.+)$/);
+    if(!m) return false;
+    var scheda = decodeSchedaFromLink(decodeURIComponent(m[1]));
+    if(!scheda || !scheda.ids || scheda.ids.length===0) return false;
+    var tpl = templateById(scheda.templateId || "__default__");
+    buildA4Sheets(
+      document.getElementById("sharedViewPages"), tpl.headerUrl, tpl.footerUrl,
+      scheda.paziente, scheda.dataVal || new Date().toLocaleDateString("it-IT"),
+      scheda.note, itemsForIds(scheda.ids)
+    );
+    document.title = schedaFilename(scheda.paziente).replace(/\.html$/, "");
+    document.getElementById("sharedDownloadBtn").onclick = function(){
+      buildA4Sheets(
+        document.getElementById("printPages"), tpl.headerUrl, tpl.footerUrl,
+        scheda.paziente, scheda.dataVal || new Date().toLocaleDateString("it-IT"),
+        scheda.note, itemsForIds(scheda.ids)
+      );
+      window.print();
+    };
+    return true;
+  }
+
   // ---------- RENDER ----------
   function render(){
     renderTree();
@@ -2272,8 +2907,11 @@
     updateSchedaCount();
   }
 
-  render();
-  checkImportFromHash();
+  if(SHARED_MODE){
+    initSharedView();
+  } else {
+    render();
+  }
 })();
 </script>
 </body>
