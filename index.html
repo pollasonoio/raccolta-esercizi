@@ -1968,6 +1968,31 @@
   };
 
   // ---------- RINOMINA SUL POSTO (direttamente nell'albero a sinistra) ----------
+  // Trova la chiave di rinomina "originale" per un nodo, anche se e' gia'
+  // stato rinominato in precedenza (altrimenti una seconda rinomina dello
+  // stesso nodo creerebbe una chiave nuova basata sul nome gia' rinominato,
+  // che pero' "applyRename" non legge mai: legge sempre a partire dal nome
+  // originale del Word/della cartella creata, non da quello visualizzato).
+  function findRenameKey(area, path){
+    var renames = FIRESTORE_OVERRIDES.treeRenames || {};
+    if(path.length === 0){
+      for(var k in renames){
+        if(k.indexOf("A::") === 0 && renames[k] === area) return k;
+      }
+      return "A::" + area;
+    }
+    var lastSeg = path[path.length - 1];
+    for(var k2 in renames){
+      if(k2.indexOf("P::") === 0 && renames[k2] === lastSeg){
+        var rest = k2.slice(3);
+        var sep = rest.indexOf("::");
+        var keyArea = rest.slice(0, sep);
+        if(keyArea === area || renames["A::" + keyArea] === area) return k2;
+      }
+    }
+    return "P::" + area + "::" + path.join("/");
+  }
+
   function startInlineRename(row, currentLabel, area, path){
     if(row.querySelector(".tree-rename-input")) return; // gia' in modifica
     var labelSpan = row.querySelector(".label");
@@ -1999,7 +2024,7 @@
       input.remove();
       labelSpan.style.display = oldDisplay;
       var renames = {}; for(var k in (FIRESTORE_OVERRIDES.treeRenames||{})) renames[k] = FIRESTORE_OVERRIDES.treeRenames[k];
-      var key = path.length===0 ? ("A::" + area) : ("P::" + area + "::" + path.join("/"));
+      var key = findRenameKey(area, path);
       renames[key] = newLabel;
       saveOverridesToFirestore({treeRenames: renames}).then(function(){
         logAction("Rinomina cartella", '"' + currentLabel + '" \u2192 "' + newLabel + '"');
