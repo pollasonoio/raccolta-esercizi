@@ -351,6 +351,40 @@
   .import-banner .ib-actions{display:flex; gap:8px; flex-shrink:0;}
   .import-banner .btn{padding:7px 12px; font-size:12.5px;}
 
+  /* ---------- MODALITA' EDITOR (catalogo condiviso via Firebase) ---------- */
+  .editor-only{display:none;}
+  .is-editor .editor-only{display:inline-flex;}
+  .editor-only.block-when-on{display:none;}
+  .is-editor .editor-only.block-when-on{display:block;}
+  #editorLockBtn{position:relative;}
+  #editorLockBtn.on{background:var(--accent-dark); color:#fff; border-color:var(--accent-dark);}
+
+  .simple-modal-overlay{
+    position:fixed; inset:0; background:rgba(20,25,30,.55);
+    display:none; align-items:center; justify-content:center; z-index:130; padding:24px;
+  }
+  .simple-modal-overlay.open{display:flex;}
+  .simple-modal{
+    background:#fff; border-radius:14px; max-width:520px; width:100%;
+    max-height:86vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,.3); padding:22px 24px;
+  }
+  .simple-modal.wide{max-width:720px;}
+  .simple-modal h3{margin:0 0 14px; font-size:16px;}
+  .simple-modal label{display:block; font-size:12.5px; font-weight:600; color:var(--text-muted); margin:12px 0 4px;}
+  .simple-modal input[type=text], .simple-modal input[type=email], .simple-modal input[type=password],
+  .simple-modal select, .simple-modal textarea{
+    width:100%; box-sizing:border-box; padding:9px 10px; border:1px solid var(--border);
+    border-radius:8px; font-size:13.5px; font-family:inherit; background:var(--bg); color:var(--text);
+  }
+  .simple-modal textarea{resize:vertical;}
+  .simple-modal .modal-actions{display:flex; gap:10px; justify-content:flex-end; margin-top:18px;}
+  .simple-modal .err-text{color:#b42318; font-size:12.5px; min-height:16px; margin-top:8px;}
+  .tree-edit-row{display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid var(--border);}
+  .tree-edit-row .tr-label{font-size:11.5px; color:var(--text-muted); flex-shrink:0; width:90px;}
+  .tree-edit-row input{flex:1;}
+  .tree-edit-row button{flex-shrink:0;}
+
+
   /* ---------- CONTENUTO SCHEDA (usato sia nell'anteprima a schermo che in stampa) ---------- */
   .print-head{border-bottom:2px solid var(--accent); padding-bottom:10px; margin-bottom:16px;}
   .print-head h1{font-size:19px; margin:0 0 6px; color:var(--accent-dark);}
@@ -468,6 +502,14 @@
   </div>
   <div class="header-spacer"></div>
   <span class="offline-badge online" id="connBadge" title="Stato connessione">In linea</span>
+  <button class="btn editor-only" id="addExerciseBtn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    Aggiungi esercizio
+  </button>
+  <button class="btn editor-only" id="editTreeBtn">Modifica albero</button>
+  <button class="btn" id="editorLockBtn" title="Modalita' editor: elimina, aggiungi e sposta esercizi">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+  </button>
   <button class="btn" id="openLibraryBtn">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v13h18V7"/><path d="M3 7l2-4h14l2 4"/><path d="M3 7h18"/></svg>
     Le mie schede
@@ -519,6 +561,10 @@
       <div class="modal-actions">
         <button class="btn primary" id="modalAddBtn"></button>
         <button class="btn" id="modalResetBtn" style="display:none;">Ripristina originale</button>
+      </div>
+      <div class="modal-actions editor-only">
+        <button class="btn" id="modalMoveBtn">Sposta in un'altra cartella</button>
+        <button class="btn danger" id="modalDeleteBtn">Elimina esercizio</button>
       </div>
     </div>
   </div>
@@ -611,6 +657,86 @@
   </div>
 </div>
 
+<!-- LOGIN MODALITA' EDITOR -->
+<div class="simple-modal-overlay" id="loginOverlay">
+  <div class="simple-modal">
+    <h3>Modalità editor</h3>
+    <p style="margin:0 0 4px; font-size:13px; color:var(--text-muted);">Accedi per eliminare, aggiungere o spostare esercizi e modificare l'albero delle cartelle. Le modifiche saranno visibili a chiunque apra l'app.</p>
+    <label for="loginEmail">Email</label>
+    <input type="email" id="loginEmail" autocomplete="username">
+    <label for="loginPassword">Password</label>
+    <input type="password" id="loginPassword" autocomplete="current-password">
+    <div class="err-text" id="loginError"></div>
+    <div class="modal-actions">
+      <button class="btn" id="loginCancelBtn">Annulla</button>
+      <button class="btn primary" id="loginSubmitBtn">Accedi</button>
+    </div>
+  </div>
+</div>
+
+<!-- AGGIUNGI ESERCIZIO -->
+<div class="simple-modal-overlay" id="addExerciseOverlay">
+  <div class="simple-modal wide">
+    <h3>Aggiungi esercizio</h3>
+    <label for="newExArea">Area</label>
+    <input type="text" id="newExArea" list="areaListDatalist" placeholder="Es. Arto Inferiore">
+    <datalist id="areaListDatalist"></datalist>
+    <label for="newExPath">Cartella (facoltativa, usa "/" per sottocartelle)</label>
+    <input type="text" id="newExPath" placeholder="Es. Ginocchio o Spalla/Rinforzo">
+    <label for="newExNome">Nome esercizio</label>
+    <input type="text" id="newExNome">
+    <label for="newExQuant">Quantità (serie x ripetizioni)</label>
+    <input type="text" id="newExQuant" placeholder="Es. 10-15 x 3-4">
+    <label for="newExDescr">Descrizione</label>
+    <textarea id="newExDescr" rows="3"></textarea>
+    <label for="newExImg">Immagine (facoltativa)</label>
+    <input type="file" id="newExImg" accept="image/*">
+    <div class="err-text" id="addExerciseError"></div>
+    <div class="modal-actions">
+      <button class="btn" id="addExerciseCancelBtn">Annulla</button>
+      <button class="btn primary" id="addExerciseSubmitBtn">Aggiungi</button>
+    </div>
+  </div>
+</div>
+
+<!-- SPOSTA ESERCIZIO -->
+<div class="simple-modal-overlay" id="moveExerciseOverlay">
+  <div class="simple-modal">
+    <h3>Sposta esercizio</h3>
+    <label for="moveExArea">Nuova area</label>
+    <input type="text" id="moveExArea" list="areaListDatalist">
+    <label for="moveExPath">Nuova cartella (facoltativa, usa "/" per sottocartelle)</label>
+    <input type="text" id="moveExPath">
+    <div class="err-text" id="moveExerciseError"></div>
+    <div class="modal-actions">
+      <button class="btn" id="moveExerciseCancelBtn">Annulla</button>
+      <button class="btn primary" id="moveExerciseSubmitBtn">Sposta</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODIFICA ALBERO -->
+<div class="simple-modal-overlay" id="editTreeOverlay">
+  <div class="simple-modal wide">
+    <h3>Modifica albero cartelle</h3>
+    <p style="margin:0 0 10px; font-size:12.5px; color:var(--text-muted);">Rinomina una cartella esistente (si applica anche alle sue sottocartelle), oppure crea una cartella vuota da riempire in seguito.</p>
+    <div id="treeEditList"></div>
+    <label for="newFolderArea" style="margin-top:16px;">Crea cartella vuota — Area</label>
+    <input type="text" id="newFolderArea" list="areaListDatalist">
+    <label for="newFolderPath">Percorso (usa "/" per sottocartelle)</label>
+    <input type="text" id="newFolderPath" placeholder="Es. Nuova Categoria">
+    <div class="err-text" id="editTreeError"></div>
+    <div class="modal-actions">
+      <button class="btn" id="editTreeCloseBtn">Chiudi</button>
+      <button class="btn primary" id="addFolderSubmitBtn">Crea cartella</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
 <script src="data.js"></script>
 <script>
 (function(){
@@ -643,8 +769,15 @@
     try{ localStorage.setItem(key, val); }catch(e){}
   }
 
+  // Override condivisi (catalogo gestito dalla modalita' editor, sincronizzati
+  // via Firebase): finche' Firebase non ha ancora risposto, sono vuoti, quindi
+  // l'app si comporta come prima (solo dati da data.js).
+  var FIRESTORE_OVERRIDES = {deletedIds: [], moves: {}, customExercises: [], treeRenames: {}, customFolders: []};
+
+  var BASE_EXERCISES = EXERCISES;
+  var CURRENT_EXERCISES = BASE_EXERCISES;
   var byId = {};
-  EXERCISES.forEach(function(e){ byId[e.id] = e; });
+  CURRENT_EXERCISES.forEach(function(e){ byId[e.id] = e; });
 
   // ---------- MODIFICHE MANUALI (descrizione / quantita) ----------
   // Le modifiche fatte dall'utente vengono salvate nel browser (localStorage)
@@ -652,7 +785,7 @@
   // originale (arrivato dall'archivio schede pazienti) resta sempre recuperabile
   // con "Ripristina originale".
   var ORIGINALS = {};
-  EXERCISES.forEach(function(e){
+  BASE_EXERCISES.forEach(function(e){
     ORIGINALS[e.id] = {nome: e.nome, descrizione: e.descrizione, quantita: e.quantita};
   });
 
@@ -703,13 +836,22 @@
   // ---------- ALBERO ----------
   function buildTree(){
     var tree = {};
-    EXERCISES.forEach(function(e){
+    CURRENT_EXERCISES.forEach(function(e){
       if(!tree[e.area]) tree[e.area] = {count:0, children:{}};
       tree[e.area].count++;
       var node = tree[e.area];
       e.path.forEach(function(seg){
         if(!node.children[seg]) node.children[seg] = {count:0, children:{}};
         node.children[seg].count++;
+        node = node.children[seg];
+      });
+    });
+    // cartelle vuote create dalla modalita' editor (ancora senza esercizi)
+    (FIRESTORE_OVERRIDES.customFolders || []).forEach(function(cf){
+      if(!tree[cf.area]) tree[cf.area] = {count:0, children:{}};
+      var node = tree[cf.area];
+      (cf.path||[]).forEach(function(seg){
+        if(!node.children[seg]) node.children[seg] = {count:0, children:{}};
         node = node.children[seg];
       });
     });
@@ -730,7 +872,7 @@
 
     var allRow = document.createElement("div");
     allRow.className = "tree-row" + (state.area===null ? " active":"");
-    allRow.innerHTML = '<span class="caret hidden-caret"></span><span class="label">Tutti gli esercizi</span><span class="cnt">'+EXERCISES.length+'</span>';
+    allRow.innerHTML = '<span class="caret hidden-caret"></span><span class="label">Tutti gli esercizi</span><span class="cnt">'+CURRENT_EXERCISES.length+'</span>';
     allRow.onclick = function(){ state.area=null; state.path=[]; render(); };
     panel.appendChild(allRow);
 
@@ -802,7 +944,7 @@
     return normalize(e.nome).indexOf(q)>=0 || normalize(e.descrizione).indexOf(q)>=0;
   }
   function getFiltered(){
-    return EXERCISES.filter(function(e){ return pathMatches(e) && queryMatches(e); });
+    return CURRENT_EXERCISES.filter(function(e){ return pathMatches(e) && queryMatches(e); });
   }
 
   // ---------- GRID ----------
@@ -993,6 +1135,350 @@
     if(ev.key==="ArrowRight") showModalAt(state.modalIndex+1);
   });
 
+  // ==========================================================================
+  // MODALITA' EDITOR — catalogo condiviso (elimina/aggiungi/sposta esercizi,
+  // modifica albero cartelle), sincronizzato tramite Firebase cosi' che le
+  // modifiche siano visibili subito a chiunque apra l'app. Se firebase-config.js
+  // non e' ancora stato compilato, FIREBASE_ENABLED e' false e questa intera
+  // sezione resta inattiva: l'app funziona come prima, solo senza editing condiviso.
+  // ==========================================================================
+  var isEditor = false;
+  var overridesDocRef = (typeof FIREBASE_ENABLED !== "undefined" && FIREBASE_ENABLED) ? firebase.firestore().collection("overrides").doc("catalog") : null;
+
+  function setEditorUI(on){
+    isEditor = on;
+    document.body.classList.toggle("is-editor", on);
+    var lockBtn = document.getElementById("editorLockBtn");
+    lockBtn.classList.toggle("on", on);
+    lockBtn.title = on ? "Modalita' editor attiva (clicca per uscire)" : "Modalita' editor: elimina, aggiungi e sposta esercizi";
+  }
+
+  function computeEffectiveList(){
+    var deleted = {};
+    (FIRESTORE_OVERRIDES.deletedIds || []).forEach(function(id){ deleted[String(id)] = true; });
+    var moves = FIRESTORE_OVERRIDES.moves || {};
+    var renames = FIRESTORE_OVERRIDES.treeRenames || {};
+
+    function applyRename(area, path){
+      var outArea = renames["A::"+area] || area;
+      var outPath = path.slice();
+      for(var len = path.length; len >= 1; len--){
+        var key = "P::" + area + "::" + path.slice(0, len).join("/");
+        if(renames[key]){
+          outPath = renames[key].split("/").filter(Boolean).concat(path.slice(len));
+          break;
+        }
+      }
+      return {area: outArea, path: outPath};
+    }
+
+    var list = [];
+    BASE_EXERCISES.forEach(function(e){
+      if(deleted[String(e.id)]) return;
+      var area = e.area, path = e.path;
+      var mv = moves[e.id];
+      if(mv){ area = mv.area; path = mv.path; }
+      var r = applyRename(area, path);
+      var copy = {}; for(var k in e){ copy[k] = e[k]; }
+      copy.area = r.area; copy.path = r.path;
+      list.push(copy);
+    });
+    (FIRESTORE_OVERRIDES.customExercises || []).forEach(function(ce){
+      if(deleted[String(ce.id)]) return;
+      var r = applyRename(ce.area, ce.path || []);
+      var copy = {}; for(var k in ce){ copy[k] = ce[k]; }
+      copy.area = r.area; copy.path = r.path;
+      list.push(copy);
+    });
+    return list;
+  }
+
+  function rebuildAll(){
+    CURRENT_EXERCISES = computeEffectiveList();
+    byId = {};
+    CURRENT_EXERCISES.forEach(function(e){ byId[e.id] = e; });
+    Object.keys(OVERRIDES).forEach(function(id){
+      if(byId[id]){
+        if(typeof OVERRIDES[id].nome === "string") byId[id].nome = OVERRIDES[id].nome;
+        if(typeof OVERRIDES[id].descrizione === "string") byId[id].descrizione = OVERRIDES[id].descrizione;
+        if(typeof OVERRIDES[id].quantita === "string") byId[id].quantita = OVERRIDES[id].quantita;
+      }
+    });
+    TREE = buildTree();
+    var selectionChanged = false;
+    Array.from(state.selected).forEach(function(id){
+      if(!byId[id]){ state.selected.delete(id); selectionChanged = true; }
+    });
+    if(selectionChanged) saveSelected();
+    renderTree(); renderGrid(); updateSchedaCount();
+  }
+
+  function saveOverridesToFirestore(patch){
+    if(!overridesDocRef) return Promise.reject(new Error("Firebase non configurato."));
+    return overridesDocRef.set(patch, {merge: true});
+  }
+
+  if(overridesDocRef){
+    overridesDocRef.onSnapshot(function(doc){
+      var data = doc.exists ? doc.data() : {};
+      FIRESTORE_OVERRIDES = {
+        deletedIds: data.deletedIds || [],
+        moves: data.moves || {},
+        customExercises: data.customExercises || [],
+        treeRenames: data.treeRenames || {},
+        customFolders: data.customFolders || []
+      };
+      rebuildAll();
+    }, function(err){
+      console.error("Errore sincronizzazione catalogo condiviso:", err);
+    });
+
+    firebase.auth().onAuthStateChanged(function(user){
+      setEditorUI(!!user);
+    });
+  }
+
+  // ---------- LOGIN / LOGOUT MODALITA' EDITOR ----------
+  document.getElementById("editorLockBtn").onclick = function(){
+    if(!overridesDocRef){
+      alert("La modalita' editor non e' ancora configurata su questo sito (manca firebase-config.js). Vedi FIREBASE_SETUP.md.");
+      return;
+    }
+    if(isEditor){
+      if(confirm("Uscire dalla modalita' editor?")) firebase.auth().signOut();
+      return;
+    }
+    document.getElementById("loginEmail").value = "";
+    document.getElementById("loginPassword").value = "";
+    document.getElementById("loginError").textContent = "";
+    document.getElementById("loginOverlay").classList.add("open");
+  };
+  document.getElementById("loginCancelBtn").onclick = function(){
+    document.getElementById("loginOverlay").classList.remove("open");
+  };
+  document.getElementById("loginSubmitBtn").onclick = function(){
+    var email = document.getElementById("loginEmail").value.trim();
+    var pwd = document.getElementById("loginPassword").value;
+    var errEl = document.getElementById("loginError");
+    errEl.textContent = "";
+    firebase.auth().signInWithEmailAndPassword(email, pwd).then(function(){
+      document.getElementById("loginOverlay").classList.remove("open");
+    }).catch(function(err){
+      errEl.textContent = "Accesso non riuscito: email o password errate.";
+    });
+  };
+
+  // ---------- ELIMINA ESERCIZIO ----------
+  document.getElementById("modalDeleteBtn").onclick = function(){
+    var id = state.modalList[state.modalIndex];
+    var e = byId[id];
+    if(!e) return;
+    if(!confirm('Eliminare definitivamente l\'esercizio "' + e.nome + '"? Sara\' rimosso per tutti.')) return;
+    var newDeleted = (FIRESTORE_OVERRIDES.deletedIds || []).slice();
+    if(newDeleted.indexOf(id) === -1) newDeleted.push(id);
+    // se era un esercizio aggiunto dall'editor (id stringa "c_..."), lo togliamo
+    // direttamente dall'elenco invece di aggiungerlo alla lista eliminati
+    var isCustom = (FIRESTORE_OVERRIDES.customExercises||[]).some(function(c){ return c.id === id; });
+    var patch = {};
+    if(isCustom){
+      patch.customExercises = (FIRESTORE_OVERRIDES.customExercises||[]).filter(function(c){ return c.id !== id; });
+    } else {
+      patch.deletedIds = newDeleted;
+    }
+    saveOverridesToFirestore(patch).then(function(){
+      closeModal();
+    }).catch(function(err){
+      alert("Non sono riuscito a eliminare l'esercizio: " + err.message);
+    });
+  };
+
+  // ---------- SPOSTA ESERCIZIO ----------
+  document.getElementById("modalMoveBtn").onclick = function(){
+    var id = state.modalList[state.modalIndex];
+    var e = byId[id];
+    if(!e) return;
+    document.getElementById("moveExArea").value = e.area || "";
+    document.getElementById("moveExPath").value = (e.path||[]).join("/");
+    document.getElementById("moveExerciseError").textContent = "";
+    document.getElementById("moveExerciseOverlay").classList.add("open");
+    document.getElementById("moveExerciseOverlay").dataset.exId = id;
+  };
+  document.getElementById("moveExerciseCancelBtn").onclick = function(){
+    document.getElementById("moveExerciseOverlay").classList.remove("open");
+  };
+  document.getElementById("moveExerciseSubmitBtn").onclick = function(){
+    var id = document.getElementById("moveExerciseOverlay").dataset.exId;
+    var area = document.getElementById("moveExArea").value.trim();
+    var path = document.getElementById("moveExPath").value.trim();
+    var errEl = document.getElementById("moveExerciseError");
+    if(!area){ errEl.textContent = "Indica almeno l'area."; return; }
+    var pathArr = path ? path.split("/").map(function(s){return s.trim();}).filter(Boolean) : [];
+
+    var isCustom = (FIRESTORE_OVERRIDES.customExercises||[]).some(function(c){ return c.id === id; });
+    var patch = {};
+    if(isCustom){
+      patch.customExercises = (FIRESTORE_OVERRIDES.customExercises||[]).map(function(c){
+        if(c.id !== id) return c;
+        var copy = {}; for(var k in c){ copy[k] = c[k]; }
+        copy.area = area; copy.path = pathArr;
+        return copy;
+      });
+    } else {
+      var moves = {}; for(var k in (FIRESTORE_OVERRIDES.moves||{})) moves[k] = FIRESTORE_OVERRIDES.moves[k];
+      moves[id] = {area: area, path: pathArr};
+      patch.moves = moves;
+    }
+    saveOverridesToFirestore(patch).then(function(){
+      document.getElementById("moveExerciseOverlay").classList.remove("open");
+      closeModal();
+    }).catch(function(err){
+      errEl.textContent = "Non sono riuscito a spostare l'esercizio: " + err.message;
+    });
+  };
+
+  // ---------- AGGIUNGI ESERCIZIO ----------
+  function refreshAreaDatalist(){
+    var dl = document.getElementById("areaListDatalist");
+    var areas = Object.keys(TREE);
+    dl.innerHTML = areas.map(function(a){ return '<option value="'+escapeHtml(a)+'">'; }).join("");
+  }
+  document.getElementById("addExerciseBtn").onclick = function(){
+    if(!isEditor) return;
+    ["newExArea","newExPath","newExNome","newExQuant","newExDescr"].forEach(function(id){
+      document.getElementById(id).value = "";
+    });
+    document.getElementById("newExImg").value = "";
+    document.getElementById("addExerciseError").textContent = "";
+    refreshAreaDatalist();
+    document.getElementById("addExerciseOverlay").classList.add("open");
+  };
+  document.getElementById("addExerciseCancelBtn").onclick = function(){
+    document.getElementById("addExerciseOverlay").classList.remove("open");
+  };
+  function resizeImageToDataUrl(file, maxSize, cb){
+    var reader = new FileReader();
+    reader.onload = function(ev){
+      var img = new Image();
+      img.onload = function(){
+        var w = img.width, h = img.height;
+        if(w > h && w > maxSize){ h = Math.round(h * maxSize / w); w = maxSize; }
+        else if(h > maxSize){ w = Math.round(w * maxSize / h); h = maxSize; }
+        var canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        cb(canvas.toDataURL("image/jpeg", 0.82));
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+  document.getElementById("addExerciseSubmitBtn").onclick = function(){
+    var area = document.getElementById("newExArea").value.trim();
+    var path = document.getElementById("newExPath").value.trim();
+    var nome = document.getElementById("newExNome").value.trim();
+    var quant = document.getElementById("newExQuant").value.trim();
+    var descr = document.getElementById("newExDescr").value.trim();
+    var fileInput = document.getElementById("newExImg");
+    var errEl = document.getElementById("addExerciseError");
+    if(!area || !nome){ errEl.textContent = "Area e nome esercizio sono obbligatori."; return; }
+    var pathArr = path ? path.split("/").map(function(s){return s.trim();}).filter(Boolean) : [];
+
+    function finalize(imgDataUrl){
+      var newId = "c_" + Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+      var newEx = {
+        id: newId, area: area, path: pathArr, nome: nome,
+        descrizione: descr, quantita: quant, img: imgDataUrl || ""
+      };
+      var list = (FIRESTORE_OVERRIDES.customExercises || []).slice();
+      list.push(newEx);
+      saveOverridesToFirestore({customExercises: list}).then(function(){
+        document.getElementById("addExerciseOverlay").classList.remove("open");
+      }).catch(function(err){
+        errEl.textContent = "Non sono riuscito a salvare: " + err.message;
+      });
+    }
+
+    if(fileInput.files && fileInput.files[0]){
+      resizeImageToDataUrl(fileInput.files[0], 900, finalize);
+    } else {
+      finalize("");
+    }
+  };
+
+  // ---------- MODIFICA ALBERO ----------
+  function renderTreeEditList(){
+    var container = document.getElementById("treeEditList");
+    container.innerHTML = "";
+    Object.keys(TREE).sort().forEach(function(area){
+      addTreeEditRow(container, "Area", area, area, []);
+      addTreeEditChildren(container, area, TREE[area].children, []);
+    });
+  }
+  function addTreeEditChildren(container, area, children, parentPath){
+    Object.keys(children).sort().forEach(function(seg){
+      var fullPath = parentPath.concat([seg]);
+      addTreeEditRow(container, "Cartella", fullPath.join(" / "), seg, fullPath, area);
+      addTreeEditChildren(container, area, children[seg].children, fullPath);
+    });
+  }
+  function addTreeEditRow(container, kind, displayLabel, currentSeg, path, area){
+    var row = document.createElement("div");
+    row.className = "tree-edit-row";
+    var lbl = document.createElement("span");
+    lbl.className = "tr-label"; lbl.textContent = kind;
+    row.appendChild(lbl);
+    var input = document.createElement("input");
+    input.type = "text";
+    input.value = displayLabel;
+    row.appendChild(input);
+    var btn = document.createElement("button");
+    btn.className = "btn"; btn.textContent = "Rinomina";
+    btn.onclick = function(){
+      var newLabel = input.value.trim();
+      if(!newLabel || newLabel === displayLabel) return;
+      var renames = {}; for(var k in (FIRESTORE_OVERRIDES.treeRenames||{})) renames[k] = FIRESTORE_OVERRIDES.treeRenames[k];
+      var key = kind === "Area" ? ("A::" + currentSeg) : ("P::" + area + "::" + path.join("/"));
+      renames[key] = newLabel;
+      saveOverridesToFirestore({treeRenames: renames}).then(function(){
+        document.getElementById("editTreeError").textContent = "";
+        renderTreeEditList();
+      }).catch(function(err){
+        document.getElementById("editTreeError").textContent = "Errore: " + err.message;
+      });
+    };
+    row.appendChild(btn);
+    container.appendChild(row);
+  }
+  document.getElementById("editTreeBtn").onclick = function(){
+    if(!isEditor) return;
+    refreshAreaDatalist();
+    renderTreeEditList();
+    document.getElementById("newFolderArea").value = "";
+    document.getElementById("newFolderPath").value = "";
+    document.getElementById("editTreeError").textContent = "";
+    document.getElementById("editTreeOverlay").classList.add("open");
+  };
+  document.getElementById("editTreeCloseBtn").onclick = function(){
+    document.getElementById("editTreeOverlay").classList.remove("open");
+  };
+  document.getElementById("addFolderSubmitBtn").onclick = function(){
+    var area = document.getElementById("newFolderArea").value.trim();
+    var path = document.getElementById("newFolderPath").value.trim();
+    var errEl = document.getElementById("editTreeError");
+    if(!area || !path){ errEl.textContent = "Indica area e percorso della nuova cartella."; return; }
+    var pathArr = path.split("/").map(function(s){return s.trim();}).filter(Boolean);
+    var folders = (FIRESTORE_OVERRIDES.customFolders || []).slice();
+    folders.push({area: area, path: pathArr});
+    saveOverridesToFirestore({customFolders: folders}).then(function(){
+      document.getElementById("newFolderArea").value = "";
+      document.getElementById("newFolderPath").value = "";
+      errEl.textContent = "";
+      renderTreeEditList();
+    }).catch(function(err){
+      errEl.textContent = "Errore: " + err.message;
+    });
+  };
+
   // ---------- DRAWER / SCHEDA ----------
   function openDrawer(){
     document.getElementById("drawer").classList.add("open");
@@ -1041,10 +1527,12 @@
   }
 
   document.getElementById("clearSchedaBtn").onclick = function(){
-    if(state.selected.size===0) return;
-    if(confirm("Svuotare completamente la scheda corrente?")){
+    if(state.selected.size===0 && !fPaziente.value) return;
+    if(confirm("Svuotare completamente la scheda corrente e il nome del paziente?")){
       state.selected.clear();
       saveSelected(); updateSchedaCount(); renderDrawer(); renderGrid();
+      fPaziente.value = "";
+      saveField("raccolta_esercizi_paziente", "");
     }
   };
 
