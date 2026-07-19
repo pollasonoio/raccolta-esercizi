@@ -6,8 +6,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#F5C400">
-<link rel="apple-touch-icon" href="icon-192.png">
-<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png?v=3">
+<link rel="icon" href="icon-192.png?v=3">
 <style>
   :root{
     --accent:#F5C400;
@@ -729,8 +729,8 @@
       <button class="btn primary" id="saveToLibraryBtn">Salva nella libreria</button>
     </div>
     <div class="drawer-foot-row">
-      <button class="btn" id="shareLinkBtn">Condividi link</button>
-      <button class="btn" id="saveSchedaBtn">Esporta file</button>
+      <button class="btn" id="shareLinkBtn" style="display:none;">Condividi link</button>
+      <button class="btn" id="saveSchedaBtn" style="flex:1;">Esporta file</button>
     </div>
     <div class="drawer-foot-row">
       <button class="btn danger" id="clearSchedaBtn">Svuota</button>
@@ -1982,30 +1982,42 @@
     input.select();
 
     var done = false;
-    function commit(save){
+    function cancel(){
       if(done) return;
       done = true;
       input.remove();
       labelSpan.style.display = oldDisplay;
+    }
+    function tryCommit(){
+      if(done) return;
       var newLabel = input.value.trim();
-      if(save && newLabel && newLabel !== currentLabel){
-        var renames = {}; for(var k in (FIRESTORE_OVERRIDES.treeRenames||{})) renames[k] = FIRESTORE_OVERRIDES.treeRenames[k];
-        var key = path.length===0 ? ("A::" + area) : ("P::" + area + "::" + path.join("/"));
-        renames[key] = newLabel;
-        saveOverridesToFirestore({treeRenames: renames}).then(function(){
-          logAction("Rinomina cartella", '"' + currentLabel + '" \u2192 "' + newLabel + '"');
-        }).catch(function(err){
-          alert("Non sono riuscito a rinominare: " + err.message);
-        });
+      if(!newLabel || newLabel === currentLabel){ cancel(); return; }
+      if(!confirm('Rinominare "' + currentLabel + '" in "' + newLabel + '"?\n\nLa modifica sara\' visibile subito a chiunque usi l\'app.')){
+        return; // resta in modifica: l'utente puo' correggere il testo o premere Esc
       }
+      done = true;
+      input.remove();
+      labelSpan.style.display = oldDisplay;
+      var renames = {}; for(var k in (FIRESTORE_OVERRIDES.treeRenames||{})) renames[k] = FIRESTORE_OVERRIDES.treeRenames[k];
+      var key = path.length===0 ? ("A::" + area) : ("P::" + area + "::" + path.join("/"));
+      renames[key] = newLabel;
+      saveOverridesToFirestore({treeRenames: renames}).then(function(){
+        logAction("Rinomina cartella", '"' + currentLabel + '" \u2192 "' + newLabel + '"');
+      }).catch(function(err){
+        alert("Non sono riuscito a rinominare: " + err.message);
+      });
     }
     input.addEventListener("keydown", function(ev){
       ev.stopPropagation();
-      if(ev.key === "Enter") commit(true);
-      if(ev.key === "Escape") commit(false);
+      if(ev.key === "Enter") tryCommit();
+      if(ev.key === "Escape") cancel();
     });
     input.addEventListener("click", function(ev){ ev.stopPropagation(); });
-    input.addEventListener("blur", function(){ commit(true); });
+    input.addEventListener("blur", function(){
+      // piccolo ritardo: se il blur e' causato dalla finestra di conferma
+      // stessa, non deve annullare la modifica in corso
+      setTimeout(function(){ if(!done) cancel(); }, 200);
+    });
   }
 
   // ---------- NUOVA CARTELLA VUOTA ----------
@@ -2674,10 +2686,8 @@
       };
       actions.appendChild(openBtn);
 
-      var linkBtn = document.createElement("button");
-      linkBtn.className = "btn"; linkBtn.textContent = "Link";
-      linkBtn.onclick = function(){ openShareModal(s); };
-      actions.appendChild(linkBtn);
+      // Il pulsante "Link" (condivisione) e' temporaneamente disattivato:
+      // il collegamento generato aveva un problema di funzionamento.
 
       var fileBtn = document.createElement("button");
       fileBtn.className = "btn"; fileBtn.textContent = "File";
