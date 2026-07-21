@@ -423,7 +423,47 @@
     body.shared-mode .shared-view-bar{display:none;}
   }
 
-  /* ---------- GATE DI ACCESSO OBBLIGATORIO ---------- */
+  /* ---------- TOAST GLOBALE DI CONFERMA ---------- */
+  .global-toast{
+    position:fixed; top:18px; left:50%; transform:translateX(-50%) translateY(-20px);
+    background:var(--accent-dark); color:#fff; font-size:13.5px; font-weight:600;
+    padding:11px 20px; border-radius:999px; box-shadow:0 8px 24px rgba(0,0,0,.25);
+    z-index:2000; opacity:0; pointer-events:none; transition:opacity .2s, transform .2s;
+    max-width:80vw; text-align:center;
+  }
+  .global-toast.show{
+    opacity:1; transform:translateX(-50%) translateY(0);
+  }
+
+  /* ---------- MENU AZIONI CARTELLA (rinomina/sposta/elimina) ---------- */
+  .tree-row{position:relative;}
+  .tree-menu-btn{
+    display:none; align-items:center; justify-content:center; flex-shrink:0;
+    width:20px; height:20px; border:none; background:transparent; color:var(--text-muted);
+    border-radius:5px; cursor:pointer; margin-left:2px;
+  }
+  .is-editor .tree-menu-btn{display:inline-flex;}
+  .tree-menu-btn:hover{background:var(--accent-light); color:var(--accent-dark);}
+  .tree-action-menu{
+    position:absolute; right:8px; top:100%; margin-top:2px; z-index:60;
+    background:#fff; border:1px solid var(--border); border-radius:9px;
+    box-shadow:0 8px 22px rgba(0,0,0,.16); min-width:150px; overflow:hidden;
+    display:none;
+  }
+  .tree-action-menu.open{display:block;}
+  .tree-action-menu button{
+    display:flex; align-items:center; gap:8px; width:100%; text-align:left;
+    padding:9px 12px; font-size:13px; border:none; background:transparent; cursor:pointer; color:var(--text);
+  }
+  .tree-action-menu button:hover{background:var(--bg);}
+  .tree-action-menu button.danger{color:#b42318;}
+  .tree-action-menu button svg{width:14px; height:14px; flex-shrink:0;}
+
+  .tree-row .label{
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;
+  }
+
+
   .gate-overlay{
     position:fixed; inset:0; background:var(--bg);
     display:none; align-items:center; justify-content:center; z-index:1000; padding:24px;
@@ -612,6 +652,8 @@
     <div id="sharedViewPages"></div>
   </div>
 </div>
+
+<div class="global-toast" id="globalToast"></div>
 
 <header>
   <h1>Raccolta Esercizi</h1>
@@ -906,17 +948,16 @@
 
 <!-- SPOSTA CARTELLA -->
 <div class="simple-modal-overlay" id="moveFolderOverlay">
-  <div class="simple-modal">
+  <div class="simple-modal wide">
     <h3 id="moveFolderTitle">Sposta cartella</h3>
-    <p style="margin:0 0 4px; font-size:12.5px; color:var(--text-muted);">Tutti gli esercizi contenuti (anche nelle eventuali sottocartelle) si sposteranno insieme alla cartella.</p>
-    <label for="moveFolderArea">Nuova area</label>
-    <input type="text" id="moveFolderArea" list="areaListDatalist">
-    <label for="moveFolderPath">Nuovo percorso (facoltativo, usa "/" per sottocartelle)</label>
-    <input type="text" id="moveFolderPath">
+    <p style="margin:0 0 10px; font-size:12.5px; color:var(--text-muted);">Tutti gli esercizi contenuti (anche nelle eventuali sottocartelle) si sposteranno insieme alla cartella. Scegli la nuova posizione nell'albero:</p>
+    <div class="folder-check-list" id="moveFolderTreeList"></div>
+    <label for="moveFolderNewTxt" style="margin-top:14px;">Oppure scrivi una destinazione nuova, non ancora nell'albero</label>
+    <input type="text" id="moveFolderNewTxt" placeholder='Es. Arto Inferiore/Nuova categoria (usa "/" per sottocartelle)'>
     <div class="err-text" id="moveFolderError"></div>
     <div class="modal-actions">
       <button class="btn" id="moveFolderCancelBtn">Annulla</button>
-      <button class="btn primary" id="moveFolderSubmitBtn">Sposta</button>
+      <button class="btn primary" id="moveFolderSubmitBtn">Sposta qui</button>
     </div>
   </div>
 </div>
@@ -1093,38 +1134,20 @@
 
     var caretSpan = '<span class="caret'+(hasChildren?"":" hidden-caret")+'" data-caret="1"></span>';
     var isSubfolder = path.length > 0; // le aree principali si gestiscono solo dai Word
-    var actionsHtml =
-      '<button type="button" class="tree-rename-btn editor-only" title="Rinomina questa cartella"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>';
-    if(isSubfolder){
-      actionsHtml +=
-        '<button type="button" class="tree-rename-btn tree-move-btn editor-only" title="Sposta questa cartella sotto un\'altra area/cartella"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><polyline points="16 3 21 3 21 8"/><line x1="21" y1="3" x2="14" y2="10"/><path d="M21 14v5a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h5"/></svg></button>' +
-        '<button type="button" class="tree-rename-btn tree-del-btn editor-only" title="Elimina questa cartella (gli esercizi passano alla cartella superiore)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg></button>';
-    }
-    row.innerHTML = caretSpan + '<span class="label"></span><span class="cnt">'+node.count+'</span>' + actionsHtml;
-    row.querySelector(".label").textContent = label;
+    var menuBtnHtml = '<button type="button" class="tree-menu-btn editor-only" title="Azioni cartella"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg></button>';
+    row.innerHTML = caretSpan + '<span class="label"></span><span class="cnt">'+node.count+'</span>' + menuBtnHtml;
+    var labelSpan0 = row.querySelector(".label");
+    labelSpan0.textContent = label;
+    labelSpan0.title = label;
     if(hasChildren){
       row.querySelector(".caret").innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="6 9 12 15 18 9"/></svg>';
     }
 
-    var renameBtn = row.querySelector(".tree-rename-btn");
-    renameBtn.onclick = function(ev){
+    var menuBtn = row.querySelector(".tree-menu-btn");
+    menuBtn.onclick = function(ev){
       ev.stopPropagation();
-      startInlineRename(row, label, area, path);
+      openTreeActionMenu(row, menuBtn, label, area, path, isSubfolder);
     };
-    var moveBtn = row.querySelector(".tree-move-btn");
-    if(moveBtn){
-      moveBtn.onclick = function(ev){
-        ev.stopPropagation();
-        openMoveFolderModal(label, area, path);
-      };
-    }
-    var delBtn = row.querySelector(".tree-del-btn");
-    if(delBtn){
-      delBtn.onclick = function(ev){
-        ev.stopPropagation();
-        deleteFolderNode(label, area, path);
-      };
-    }
 
     var childWrap = document.createElement("div");
     childWrap.className = "tree-children";
@@ -1667,6 +1690,7 @@
       patch.deletedIds = newDeleted;
     }
     saveOverridesToFirestore(patch).then(function(){
+      showToast('Esercizio "' + e.nome + '" eliminato.');
       closeModal();
     }).catch(function(err){
       alert("Non sono riuscito a eliminare l'esercizio: " + err.message);
@@ -1759,6 +1783,7 @@
       patch.folders = foldersMap;
     }
     saveOverridesToFirestore(patch).then(function(){
+      showToast("Cartelle aggiornate (" + checked.length + (checked.length===1?" cartella":" cartelle") + ").");
       document.getElementById("foldersOverlay").classList.remove("open");
       closeModal();
     }).catch(function(err){
@@ -1889,6 +1914,7 @@
       var list = (FIRESTORE_OVERRIDES.customExercises || []).slice();
       list.push(newEx);
       saveOverridesToFirestore({customExercises: list}).then(function(){
+        showToast('Esercizio "' + nome + '" aggiunto.');
         document.getElementById("addExerciseOverlay").classList.remove("open");
       }).catch(function(err){
         errEl.textContent = "Non sono riuscito a salvare: " + err.message;
@@ -2056,7 +2082,61 @@
     }
   };
 
-  // ---------- SPOSTA / ELIMINA CARTELLA INTERA (con tutto il contenuto) ----------
+  // ---------- TOAST GLOBALE DI CONFERMA ----------
+  var toastTimer = null;
+  function showToast(msg){
+    var el = document.getElementById("globalToast");
+    el.textContent = msg;
+    el.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ el.classList.remove("show"); }, 2600);
+  }
+
+  // ---------- MENU AZIONI CARTELLA (rinomina / sposta / elimina) ----------
+  var openTreeMenuEl = null;
+  function closeTreeActionMenu(){
+    if(openTreeMenuEl){ openTreeMenuEl.remove(); openTreeMenuEl = null; }
+  }
+  document.addEventListener("click", closeTreeActionMenu);
+  function openTreeActionMenu(row, anchorBtn, label, area, path, isSubfolder){
+    if(openTreeMenuEl){ closeTreeActionMenu(); return; }
+    var menu = document.createElement("div");
+    menu.className = "tree-action-menu open";
+    var renameItem = document.createElement("button");
+    renameItem.type = "button";
+    renameItem.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Rinomina';
+    renameItem.onclick = function(ev){
+      ev.stopPropagation();
+      closeTreeActionMenu();
+      startInlineRename(row, label, area, path);
+    };
+    menu.appendChild(renameItem);
+    if(isSubfolder){
+      var moveItem = document.createElement("button");
+      moveItem.type = "button";
+      moveItem.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 3 21 3 21 8"/><line x1="21" y1="3" x2="14" y2="10"/><path d="M21 14v5a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h5"/></svg> Sposta';
+      moveItem.onclick = function(ev){
+        ev.stopPropagation();
+        closeTreeActionMenu();
+        openMoveFolderModal(label, area, path);
+      };
+      menu.appendChild(moveItem);
+      var delItem = document.createElement("button");
+      delItem.type = "button";
+      delItem.className = "danger";
+      delItem.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg> Elimina';
+      delItem.onclick = function(ev){
+        ev.stopPropagation();
+        closeTreeActionMenu();
+        deleteFolderNode(label, area, path);
+      };
+      menu.appendChild(delItem);
+    }
+    row.appendChild(menu);
+    openTreeMenuEl = menu;
+  }
+
+
   // Sposta ogni esercizio la cui posizione ricade dentro l'area/percorso
   // indicato (compresi quelli nelle sottocartelle) verso una nuova
   // destinazione, mantenendo l'eventuale parte di percorso oltre il nodo
@@ -2095,16 +2175,45 @@
     return saveOverridesToFirestore({folders: foldersMap, customFolders: newCustomFolders});
   }
 
+  function renderMoveFolderTree(excludeArea, excludePath){
+    var excludePrefix = excludePath.join("/");
+    var list = flattenTreeForChecklist().filter(function(node){
+      if(node.area !== excludeArea) return true;
+      var nodePrefix = node.path.join("/");
+      // esclude il nodo stesso e tutte le sue sottocartelle (non puoi spostare
+      // una cartella dentro se stessa o dentro una delle sue sottocartelle)
+      return !(nodePrefix === excludePrefix || nodePrefix.indexOf(excludePrefix + "/") === 0);
+    });
+    var container = document.getElementById("moveFolderTreeList");
+    container.innerHTML = "";
+    list.forEach(function(node){
+      var row = document.createElement("label");
+      row.className = "folder-check-row";
+      row.style.paddingLeft = (node.depth * 16) + "px";
+      var radio = document.createElement("input");
+      radio.type = "radio";
+      radio.name = "moveFolderDest";
+      radio.dataset.area = node.area;
+      radio.dataset.path = JSON.stringify(node.path);
+      row.appendChild(radio);
+      var lbl = document.createElement("span");
+      lbl.textContent = (node.depth===0 ? "" : "") + node.label;
+      row.appendChild(lbl);
+      var cnt = document.createElement("span");
+      cnt.className = "fc-count"; cnt.textContent = node.count + (node.count===1?" esercizio":" esercizi");
+      row.appendChild(cnt);
+      container.appendChild(row);
+    });
+  }
   function openMoveFolderModal(label, area, path){
     document.getElementById("moveFolderTitle").textContent = 'Sposta "' + label + '"';
-    document.getElementById("moveFolderArea").value = area;
-    document.getElementById("moveFolderPath").value = path.join("/");
+    document.getElementById("moveFolderNewTxt").value = "";
     document.getElementById("moveFolderError").textContent = "";
     document.getElementById("moveFolderOverlay").classList.add("open");
     document.getElementById("moveFolderOverlay").dataset.srcArea = area;
     document.getElementById("moveFolderOverlay").dataset.srcPath = JSON.stringify(path);
     document.getElementById("moveFolderOverlay").dataset.label = label;
-    refreshAreaDatalist();
+    renderMoveFolderTree(area, path);
   }
   document.getElementById("moveFolderCancelBtn").onclick = function(){
     document.getElementById("moveFolderOverlay").classList.remove("open");
@@ -2114,11 +2223,23 @@
     var srcArea = ov.dataset.srcArea;
     var srcPath = JSON.parse(ov.dataset.srcPath);
     var label = ov.dataset.label;
-    var newArea = document.getElementById("moveFolderArea").value.trim();
-    var newPathTxt = document.getElementById("moveFolderPath").value.trim();
     var errEl = document.getElementById("moveFolderError");
-    if(!newArea){ errEl.textContent = "Indica almeno l'area di destinazione."; return; }
-    var newPath = newPathTxt ? newPathTxt.split("/").map(function(s){return s.trim();}).filter(Boolean) : [];
+
+    var newArea, newPath;
+    var newTxt = document.getElementById("moveFolderNewTxt").value.trim();
+    var checkedRadio = document.querySelector('input[name="moveFolderDest"]:checked');
+    if(newTxt){
+      var segs = newTxt.split("/").map(function(s){return s.trim();}).filter(Boolean);
+      if(segs.length===0){ errEl.textContent = "Scrivi almeno l'area di destinazione."; return; }
+      newArea = segs[0];
+      newPath = segs.slice(1);
+    } else if(checkedRadio){
+      newArea = checkedRadio.dataset.area;
+      newPath = JSON.parse(checkedRadio.dataset.path);
+    } else {
+      errEl.textContent = "Scegli una destinazione dall'albero, oppure scrivine una nuova qui sotto.";
+      return;
+    }
     if(newArea === srcArea && newPath.join("/") === srcPath.join("/")){
       errEl.textContent = "La destinazione e' uguale alla posizione attuale.";
       return;
@@ -2126,6 +2247,7 @@
     if(!confirm('Spostare "' + label + '" (e tutto il suo contenuto) sotto "' + [newArea].concat(newPath).join(" / ") + '"?\n\nLa modifica sara\' visibile subito a chiunque usi l\'app.')) return;
     bulkRelocateFolder(srcArea, srcPath, newArea, newPath).then(function(){
       logAction("Spostata cartella", '"' + label + '" \u2192 "' + [newArea].concat(newPath).join(" / ") + '"');
+      showToast('Cartella "' + label + '" spostata.');
       ov.classList.remove("open");
     }).catch(function(err){
       errEl.textContent = "Non sono riuscito a spostare la cartella: " + err.message;
@@ -2138,6 +2260,7 @@
     if(!confirm('Eliminare la cartella "' + label + '"?\n\nGli esercizi al suo interno (e nelle eventuali sottocartelle) verranno spostati in "' + parentLabel + '". Nessun esercizio verra\' cancellato.\n\nLa modifica sara\' visibile subito a chiunque usi l\'app.')) return;
     bulkRelocateFolder(area, path, area, parentPath).then(function(){
       logAction("Eliminata cartella", '"' + label + '" (contenuto spostato in "' + parentLabel + '")');
+      showToast('Cartella "' + label + '" eliminata (esercizi spostati in "' + parentLabel + '").');
     }).catch(function(err){
       alert("Non sono riuscito a eliminare la cartella: " + err.message);
     });
@@ -2204,6 +2327,7 @@
       renames[key] = newLabel;
       saveOverridesToFirestore({treeRenames: renames}).then(function(){
         logAction("Rinomina cartella", '"' + currentLabel + '" \u2192 "' + newLabel + '"');
+        showToast('Cartella rinominata in "' + newLabel + '".');
       }).catch(function(err){
         alert("Non sono riuscito a rinominare: " + err.message);
       });
@@ -2243,6 +2367,7 @@
     folders.push({area: area, path: pathArr});
     saveOverridesToFirestore({customFolders: folders}).then(function(){
       logAction("Nuova cartella", [area].concat(pathArr).join(" / "));
+      showToast('Cartella "' + pathArr[pathArr.length-1] + '" creata.');
       document.getElementById("newFolderArea").value = "";
       document.getElementById("newFolderPath").value = "";
       errEl.textContent = "";
