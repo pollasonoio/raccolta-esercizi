@@ -389,6 +389,9 @@
     background:var(--accent-pale); color:var(--accent-dark); border:1px solid var(--accent-light);
     border-radius:999px; padding:3px 10px; font-size:11.5px; font-weight:600;
   }
+  .tag-chip-manual{
+    background:#eef2ff; color:#3730a3; border-color:#e0e7ff;
+  }
   .tree-rename-btn{
     display:none; align-items:center; justify-content:center; flex-shrink:0;
     width:20px; height:20px; border:none; background:transparent; color:var(--text-muted);
@@ -614,7 +617,7 @@
   <h1>Raccolta Esercizi</h1>
   <div class="search-wrap">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-    <input id="searchInput" type="text" placeholder="Cerca esercizio per nome o descrizione...">
+    <input id="searchInput" type="text" placeholder="Cerca esercizio per nome, descrizione o #tag...">
   </div>
   <div class="header-spacer"></div>
   <span class="offline-badge online" id="connBadge" title="Stato connessione">In linea</span>
@@ -677,6 +680,12 @@
 
       <label class="field-label" for="modalDescrInput">Descrizione</label>
       <textarea id="modalDescrInput" class="edit-descr" rows="4" placeholder="Descrivi come si esegue l'esercizio..."></textarea>
+
+      <div class="modal-tags" id="modalManualTags"></div>
+      <div class="editor-only">
+        <label class="field-label" for="modalTagsInput">Tag di ricerca (separati da spazio)</label>
+        <input type="text" id="modalTagsInput" class="edit-quant" placeholder="Es. #bilanciere #manubri #elastico">
+      </div>
 
       <div class="edit-status" id="editStatus"></div>
 
@@ -895,6 +904,23 @@
   </div>
 </div>
 
+<!-- SPOSTA CARTELLA -->
+<div class="simple-modal-overlay" id="moveFolderOverlay">
+  <div class="simple-modal">
+    <h3 id="moveFolderTitle">Sposta cartella</h3>
+    <p style="margin:0 0 4px; font-size:12.5px; color:var(--text-muted);">Tutti gli esercizi contenuti (anche nelle eventuali sottocartelle) si sposteranno insieme alla cartella.</p>
+    <label for="moveFolderArea">Nuova area</label>
+    <input type="text" id="moveFolderArea" list="areaListDatalist">
+    <label for="moveFolderPath">Nuovo percorso (facoltativo, usa "/" per sottocartelle)</label>
+    <input type="text" id="moveFolderPath">
+    <div class="err-text" id="moveFolderError"></div>
+    <div class="modal-actions">
+      <button class="btn" id="moveFolderCancelBtn">Annulla</button>
+      <button class="btn primary" id="moveFolderSubmitBtn">Sposta</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -940,7 +966,7 @@
   var SHARED_MODE = /#s=/.test(location.hash || "");
   if(SHARED_MODE) document.body.classList.add("shared-mode");
 
-  var FIRESTORE_OVERRIDES = {deletedIds: [], folders: {}, moves: {}, customExercises: [], treeRenames: {}, customFolders: []};
+  var FIRESTORE_OVERRIDES = {deletedIds: [], folders: {}, moves: {}, customExercises: [], treeRenames: {}, customFolders: [], tags: {}};
 
   var BASE_EXERCISES = EXERCISES;
   var CURRENT_EXERCISES = BASE_EXERCISES;
@@ -1066,7 +1092,15 @@
     row.dataset.path = JSON.stringify(path);
 
     var caretSpan = '<span class="caret'+(hasChildren?"":" hidden-caret")+'" data-caret="1"></span>';
-    row.innerHTML = caretSpan + '<span class="label"></span><span class="cnt">'+node.count+'</span><button type="button" class="tree-rename-btn editor-only" title="Rinomina questa cartella"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>';
+    var isSubfolder = path.length > 0; // le aree principali si gestiscono solo dai Word
+    var actionsHtml =
+      '<button type="button" class="tree-rename-btn editor-only" title="Rinomina questa cartella"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>';
+    if(isSubfolder){
+      actionsHtml +=
+        '<button type="button" class="tree-rename-btn tree-move-btn editor-only" title="Sposta questa cartella sotto un\'altra area/cartella"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><polyline points="16 3 21 3 21 8"/><line x1="21" y1="3" x2="14" y2="10"/><path d="M21 14v5a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h5"/></svg></button>' +
+        '<button type="button" class="tree-rename-btn tree-del-btn editor-only" title="Elimina questa cartella (gli esercizi passano alla cartella superiore)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg></button>';
+    }
+    row.innerHTML = caretSpan + '<span class="label"></span><span class="cnt">'+node.count+'</span>' + actionsHtml;
     row.querySelector(".label").textContent = label;
     if(hasChildren){
       row.querySelector(".caret").innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="6 9 12 15 18 9"/></svg>';
@@ -1077,6 +1111,20 @@
       ev.stopPropagation();
       startInlineRename(row, label, area, path);
     };
+    var moveBtn = row.querySelector(".tree-move-btn");
+    if(moveBtn){
+      moveBtn.onclick = function(ev){
+        ev.stopPropagation();
+        openMoveFolderModal(label, area, path);
+      };
+    }
+    var delBtn = row.querySelector(".tree-del-btn");
+    if(delBtn){
+      delBtn.onclick = function(ev){
+        ev.stopPropagation();
+        deleteFolderNode(label, area, path);
+      };
+    }
 
     var childWrap = document.createElement("div");
     childWrap.className = "tree-children";
@@ -1114,10 +1162,14 @@
     }
     return true;
   }
+  function tagsOf(id){
+    var t = (FIRESTORE_OVERRIDES.tags || {})[id];
+    return t || "";
+  }
   function queryMatches(e){
     if(!state.query) return true;
     var q = normalize(state.query);
-    return normalize(e.nome).indexOf(q)>=0 || normalize(e.descrizione).indexOf(q)>=0;
+    return normalize(e.nome).indexOf(q)>=0 || normalize(e.descrizione).indexOf(q)>=0 || normalize(tagsOf(e.id)).indexOf(q)>=0;
   }
   function getFiltered(){
     return CURRENT_EXERCISES.filter(function(e){ return pathMatches(e) && queryMatches(e); });
@@ -1240,6 +1292,16 @@
     document.getElementById("modalNomeInput").value = e.nome || "";
     document.getElementById("modalQuantInput").value = e.quantita || "";
     document.getElementById("modalDescrInput").value = e.descrizione || "";
+    var manualTagsEl = document.getElementById("modalManualTags");
+    manualTagsEl.innerHTML = "";
+    var currentTags = tagsOf(e.id);
+    currentTags.split(/\s+/).filter(Boolean).forEach(function(t){
+      var chip = document.createElement("span");
+      chip.className = "tag-chip tag-chip-manual";
+      chip.textContent = t.charAt(0) === "#" ? t : ("#" + t);
+      manualTagsEl.appendChild(chip);
+    });
+    document.getElementById("modalTagsInput").value = currentTags;
     document.getElementById("editStatus").textContent = "";
     refreshResetBtn(e.id);
     refreshModalAddBtn(e.id);
@@ -1288,6 +1350,31 @@
   wireEditableField(document.getElementById("modalNomeInput"), "nome");
   wireEditableField(document.getElementById("modalQuantInput"), "quantita");
   wireEditableField(document.getElementById("modalDescrInput"), "descrizione");
+
+  // ---------- TAG MANUALI (condivisi, solo editor puo' modificarli) ----------
+  var tagsSaveTimer = null;
+  function saveTagsFor(id, value){
+    var tagsMap = {}; for(var k in (FIRESTORE_OVERRIDES.tags||{})) tagsMap[k] = FIRESTORE_OVERRIDES.tags[k];
+    var cleaned = value.trim();
+    if(cleaned) tagsMap[id] = cleaned; else delete tagsMap[id];
+    saveOverridesToFirestore({tags: tagsMap}).then(function(){
+      logAction("Modificati tag", cleaned || "(rimossi)");
+    }).catch(function(err){
+      alert("Non sono riuscito a salvare i tag: " + err.message);
+    });
+  }
+  var modalTagsInputEl = document.getElementById("modalTagsInput");
+  modalTagsInputEl.addEventListener("input", function(){
+    clearTimeout(tagsSaveTimer);
+    var id = state.modalList[state.modalIndex];
+    tagsSaveTimer = setTimeout(function(){ saveTagsFor(id, modalTagsInputEl.value); }, 700);
+  });
+  modalTagsInputEl.addEventListener("blur", function(){
+    clearTimeout(tagsSaveTimer);
+    var id = state.modalList[state.modalIndex];
+    saveTagsFor(id, modalTagsInputEl.value);
+  });
+
   function refreshModalAddBtn(id){
     var btn = document.getElementById("modalAddBtn");
     var active = state.selected.has(id);
@@ -1521,10 +1608,12 @@
       var data = doc.exists ? doc.data() : {};
       FIRESTORE_OVERRIDES = {
         deletedIds: data.deletedIds || [],
+        folders: data.folders || {},
         moves: data.moves || {},
         customExercises: data.customExercises || [],
         treeRenames: data.treeRenames || {},
-        customFolders: data.customFolders || []
+        customFolders: data.customFolders || [],
+        tags: data.tags || {}
       };
       rebuildAll();
     }, function(err){
@@ -1967,7 +2056,94 @@
     }
   };
 
-  // ---------- RINOMINA SUL POSTO (direttamente nell'albero a sinistra) ----------
+  // ---------- SPOSTA / ELIMINA CARTELLA INTERA (con tutto il contenuto) ----------
+  // Sposta ogni esercizio la cui posizione ricade dentro l'area/percorso
+  // indicato (compresi quelli nelle sottocartelle) verso una nuova
+  // destinazione, mantenendo l'eventuale parte di percorso oltre il nodo
+  // spostato. Aggiorna anche le cartelle vuote create manualmente.
+  function bulkRelocateFolder(area, path, newArea, newPath){
+    var prefix = path.join("/");
+    var idsToUpdate = {};
+    CURRENT_EXERCISES.forEach(function(ex){
+      if(ex.area !== area) return;
+      var exPrefix = (ex.path||[]).join("/");
+      var matches = exPrefix === prefix || exPrefix.indexOf(prefix + "/") === 0;
+      if(!matches) return;
+      if(idsToUpdate[ex.id]) return; // gia' calcolato (evita di rifarlo per ogni copia multi-cartella)
+      idsToUpdate[ex.id] = currentLocationsOf(ex.id).map(function(l){
+        var lPrefix = (l.path||[]).join("/");
+        if(l.area===area && (lPrefix===prefix || lPrefix.indexOf(prefix+"/")===0)){
+          var suf = l.path.slice(path.length);
+          return {area: newArea, path: newPath.concat(suf)};
+        }
+        return l;
+      });
+    });
+    var foldersMap = {}; for(var k in (FIRESTORE_OVERRIDES.folders||{})) foldersMap[k] = FIRESTORE_OVERRIDES.folders[k];
+    Object.keys(idsToUpdate).forEach(function(id){ foldersMap[id] = idsToUpdate[id]; });
+
+    var newCustomFolders = (FIRESTORE_OVERRIDES.customFolders||[]).map(function(cf){
+      if(cf.area !== area) return cf;
+      var cfPrefix = (cf.path||[]).join("/");
+      if(cfPrefix === prefix || cfPrefix.indexOf(prefix+"/")===0){
+        var suf = cf.path.slice(path.length);
+        return {area: newArea, path: newPath.concat(suf)};
+      }
+      return cf;
+    });
+
+    return saveOverridesToFirestore({folders: foldersMap, customFolders: newCustomFolders});
+  }
+
+  function openMoveFolderModal(label, area, path){
+    document.getElementById("moveFolderTitle").textContent = 'Sposta "' + label + '"';
+    document.getElementById("moveFolderArea").value = area;
+    document.getElementById("moveFolderPath").value = path.join("/");
+    document.getElementById("moveFolderError").textContent = "";
+    document.getElementById("moveFolderOverlay").classList.add("open");
+    document.getElementById("moveFolderOverlay").dataset.srcArea = area;
+    document.getElementById("moveFolderOverlay").dataset.srcPath = JSON.stringify(path);
+    document.getElementById("moveFolderOverlay").dataset.label = label;
+    refreshAreaDatalist();
+  }
+  document.getElementById("moveFolderCancelBtn").onclick = function(){
+    document.getElementById("moveFolderOverlay").classList.remove("open");
+  };
+  document.getElementById("moveFolderSubmitBtn").onclick = function(){
+    var ov = document.getElementById("moveFolderOverlay");
+    var srcArea = ov.dataset.srcArea;
+    var srcPath = JSON.parse(ov.dataset.srcPath);
+    var label = ov.dataset.label;
+    var newArea = document.getElementById("moveFolderArea").value.trim();
+    var newPathTxt = document.getElementById("moveFolderPath").value.trim();
+    var errEl = document.getElementById("moveFolderError");
+    if(!newArea){ errEl.textContent = "Indica almeno l'area di destinazione."; return; }
+    var newPath = newPathTxt ? newPathTxt.split("/").map(function(s){return s.trim();}).filter(Boolean) : [];
+    if(newArea === srcArea && newPath.join("/") === srcPath.join("/")){
+      errEl.textContent = "La destinazione e' uguale alla posizione attuale.";
+      return;
+    }
+    if(!confirm('Spostare "' + label + '" (e tutto il suo contenuto) sotto "' + [newArea].concat(newPath).join(" / ") + '"?\n\nLa modifica sara\' visibile subito a chiunque usi l\'app.')) return;
+    bulkRelocateFolder(srcArea, srcPath, newArea, newPath).then(function(){
+      logAction("Spostata cartella", '"' + label + '" \u2192 "' + [newArea].concat(newPath).join(" / ") + '"');
+      ov.classList.remove("open");
+    }).catch(function(err){
+      errEl.textContent = "Non sono riuscito a spostare la cartella: " + err.message;
+    });
+  };
+
+  function deleteFolderNode(label, area, path){
+    var parentPath = path.slice(0, -1);
+    var parentLabel = parentPath.length ? parentPath[parentPath.length-1] : area;
+    if(!confirm('Eliminare la cartella "' + label + '"?\n\nGli esercizi al suo interno (e nelle eventuali sottocartelle) verranno spostati in "' + parentLabel + '". Nessun esercizio verra\' cancellato.\n\nLa modifica sara\' visibile subito a chiunque usi l\'app.')) return;
+    bulkRelocateFolder(area, path, area, parentPath).then(function(){
+      logAction("Eliminata cartella", '"' + label + '" (contenuto spostato in "' + parentLabel + '")');
+    }).catch(function(err){
+      alert("Non sono riuscito a eliminare la cartella: " + err.message);
+    });
+  }
+
+
   // Trova la chiave di rinomina "originale" per un nodo, anche se e' gia'
   // stato rinominato in precedenza (altrimenti una seconda rinomina dello
   // stesso nodo creerebbe una chiave nuova basata sul nome gia' rinominato,
@@ -2471,8 +2647,8 @@
       '.a4-sheet .a4-header{flex-shrink:0;width:100%;display:block;margin-bottom:0.5cm;}' +
       '.a4-sheet .a4-footer{flex-shrink:0;width:100%;display:block;margin-top:0.5cm;}' +
       '.a4-sheet .a4-body{flex:1 1 auto;overflow:hidden;}' +
-      '.print-head{border-bottom:2px solid #0f6a37;padding-bottom:10px;margin-bottom:16px;}' +
-      '.print-head h1{font-size:19px;margin:0 0 6px;color:#0a4d28;}' +
+      '.print-head{border-bottom:2px solid #F5C400;padding-bottom:10px;margin-bottom:16px;}' +
+      '.print-head h1{font-size:19px;margin:0 0 6px;color:#7a5c00;}' +
       '.print-meta{font-size:13px;color:#333;display:flex;gap:22px;}' +
       '.print-note{margin-top:8px;font-size:12.5px;color:#333;white-space:pre-line;}' +
       '.print-item{display:flex;gap:14px;padding:12px 0;border-bottom:1px solid #ddd;break-inside:avoid;}' +
@@ -2480,7 +2656,7 @@
       '.print-item .pi-thumb img{width:100%;height:100%;object-fit:contain;display:block;}' +
       '.print-item .pi-text{flex:1;min-width:0;}' +
       '.print-item h4{margin:0 0 4px;font-size:14px;}' +
-      '.print-item .pq{font-size:12px;font-weight:700;color:#0a4d28;margin-bottom:3px;}' +
+      '.print-item .pq{font-size:12px;font-weight:700;color:#7a5c00;margin-bottom:3px;}' +
       '.print-item p{margin:0;font-size:12px;color:#333;line-height:1.4;}' +
       '.print-item .pnotes{margin-top:6px;font-size:11.5px;color:#888;border-top:1px dashed #ccc;padding-top:4px;}' +
       '.a4-page-number{text-align:center;font-size:10.5px;color:#888;margin-top:0.3cm;flex-shrink:0;}' +
