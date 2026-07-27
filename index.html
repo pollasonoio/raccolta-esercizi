@@ -213,6 +213,27 @@
     z-index:3;
   }
   .modal .modal-img{width:100%; max-height:46vh; object-fit:contain; background:#111318; display:block;}
+  .modal-img-wrap{position:relative;}
+  .photo-nav-btn{
+    position:absolute; top:50%; transform:translateY(-50%); z-index:5;
+    width:32px; height:32px; border-radius:50%; border:none; background:rgba(0,0,0,.5);
+    color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+  .photo-nav-btn:hover{background:rgba(0,0,0,.75);}
+  .photo-nav-prev{left:10px;}
+  .photo-nav-next{right:10px;}
+  .photo-nav-btn.hidden{display:none;}
+  .photo-counter{
+    position:absolute; bottom:10px; right:10px; z-index:5;
+    background:rgba(0,0,0,.55); color:#fff; font-size:11px; font-weight:700;
+    padding:3px 9px; border-radius:999px;
+  }
+  .photo-counter.hidden{display:none;}
+  .photo-edit-bar{
+    display:none; gap:8px; flex-wrap:wrap; padding:10px 22px 0;
+  }
+  .is-editor .photo-edit-bar{display:flex;}
+  .photo-edit-bar .btn{padding:6px 11px; font-size:12px;}
   .modal .modal-body{padding:20px 24px 26px;}
   .modal .crumbs{font-size:12px; color:var(--text-muted); margin-bottom:6px;}
   .field-label{
@@ -710,7 +731,22 @@
     <button class="close-x" id="modalClose">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
-    <img class="modal-img" id="modalImg" src="" alt="">
+    <div class="modal-img-wrap">
+      <img class="modal-img" id="modalImg" src="" alt="">
+      <button type="button" class="photo-nav-btn photo-nav-prev" id="photoNavPrev" title="Foto precedente">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <button type="button" class="photo-nav-btn photo-nav-next" id="photoNavNext" title="Foto successiva">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+      <div class="photo-counter" id="photoCounter"></div>
+    </div>
+    <div class="editor-only photo-edit-bar">
+      <button type="button" class="btn" id="photoReplaceBtn">Sostituisci questa foto</button>
+      <button type="button" class="btn" id="photoAddBtn">Aggiungi foto</button>
+      <button type="button" class="btn danger" id="photoRemoveBtn">Rimuovi questa foto</button>
+      <input type="file" id="photoFileInput" accept="image/*" style="display:none;">
+    </div>
     <div class="modal-tags" id="modalTags"></div>
     <div class="modal-body">
       <div class="crumbs" id="modalCrumbs"></div>
@@ -1016,6 +1052,18 @@
   // modifiche (eliminazioni, tag, cartelle, rinomine).
   var CUSTOM_EXERCISES = [];
   var customExercisesColRef = (typeof FIREBASE_ENABLED !== "undefined" && FIREBASE_ENABLED) ? firebase.firestore().collection("customExercises") : null;
+  // Foto personalizzate per esercizio (fino a 3): sostituiscono o si
+  // aggiungono alla foto originale che arriva dal Word. Vivono in una
+  // collezione a parte (un documento per esercizio), per lo stesso motivo
+  // per cui gli esercizi personalizzati sono stati spostati li': non far
+  // mai rischiare di superare il limite di 1MB del cassetto principale.
+  var EXERCISE_PHOTOS = {};
+  var exercisePhotosColRef = (typeof FIREBASE_ENABLED !== "undefined" && FIREBASE_ENABLED) ? firebase.firestore().collection("exercisePhotos") : null;
+  function photosOf(id, fallbackImg){
+    var p = EXERCISE_PHOTOS[id];
+    if(p && p.length) return p;
+    return fallbackImg ? [fallbackImg] : [];
+  }
 
   var BASE_EXERCISES = EXERCISES;
   var CURRENT_EXERCISES = BASE_EXERCISES;
@@ -1251,9 +1299,10 @@
 
       var thumb = document.createElement("div");
       thumb.className = "thumb";
-      if(e.img){
+      var thumbSrc = photosOf(e.id, e.img)[0];
+      if(thumbSrc){
         var img = document.createElement("img");
-        img.src = e.img; img.loading = "lazy"; img.alt = e.nome;
+        img.src = thumbSrc; img.loading = "lazy"; img.alt = e.nome;
         thumb.appendChild(img);
       }
       card.appendChild(thumb);
@@ -1308,8 +1357,8 @@
     if(idx>=state.modalList.length) idx = 0;
     state.modalIndex = idx;
     var e = byId[state.modalList[idx]];
-    document.getElementById("modalImg").src = e.img || "";
-    document.getElementById("modalImg").style.display = e.img ? "block":"none";
+    state.photoIndex = 0;
+    renderModalPhoto();
     var tagsEl = document.getElementById("modalTags");
     tagsEl.innerHTML = "";
     currentLocationsOf(e.id).forEach(function(loc){
@@ -1339,6 +1388,96 @@
     document.getElementById("navPrev").style.display = state.modalList.length>1 ? "flex":"none";
     document.getElementById("navNext").style.display = state.modalList.length>1 ? "flex":"none";
   }
+
+  // ---------- GALLERIA FOTO (fino a 3 per esercizio) ----------
+  function currentModalExercise(){
+    return byId[state.modalList[state.modalIndex]];
+  }
+  function renderModalPhoto(){
+    var e = currentModalExercise();
+    if(!e) return;
+    var photos = photosOf(e.id, e.img);
+    if(state.photoIndex >= photos.length) state.photoIndex = 0;
+    var src = photos[state.photoIndex] || "";
+    var imgEl = document.getElementById("modalImg");
+    imgEl.src = src;
+    imgEl.style.display = src ? "block" : "none";
+    var multi = photos.length > 1;
+    document.getElementById("photoNavPrev").classList.toggle("hidden", !multi);
+    document.getElementById("photoNavNext").classList.toggle("hidden", !multi);
+    var counter = document.getElementById("photoCounter");
+    counter.classList.toggle("hidden", !multi);
+    counter.textContent = (state.photoIndex+1) + " / " + photos.length;
+    document.getElementById("photoAddBtn").disabled = photos.length >= 3;
+    document.getElementById("photoRemoveBtn").style.display = (EXERCISE_PHOTOS[e.id] && EXERCISE_PHOTOS[e.id].length) ? "inline-flex" : "none";
+  }
+  document.getElementById("photoNavPrev").onclick = function(){
+    var e = currentModalExercise(); if(!e) return;
+    var n = photosOf(e.id, e.img).length;
+    state.photoIndex = (state.photoIndex - 1 + n) % n;
+    renderModalPhoto();
+  };
+  document.getElementById("photoNavNext").onclick = function(){
+    var e = currentModalExercise(); if(!e) return;
+    var n = photosOf(e.id, e.img).length;
+    state.photoIndex = (state.photoIndex + 1) % n;
+    renderModalPhoto();
+  };
+
+  function saveExercisePhotos(id, photos){
+    if(photos.length === 0){
+      return exercisePhotosColRef.doc(id).delete();
+    }
+    return exercisePhotosColRef.doc(id).set({photos: photos});
+  }
+
+  var photoActionMode = null; // "replace" oppure "add"
+  document.getElementById("photoReplaceBtn").onclick = function(){
+    photoActionMode = "replace";
+    document.getElementById("photoFileInput").click();
+  };
+  document.getElementById("photoAddBtn").onclick = function(){
+    if(document.getElementById("photoAddBtn").disabled) return;
+    photoActionMode = "add";
+    document.getElementById("photoFileInput").click();
+  };
+  document.getElementById("photoFileInput").onchange = function(ev){
+    var file = ev.target.files[0];
+    ev.target.value = ""; // permette di ricaricare lo stesso file una seconda volta
+    if(!file) return;
+    var e = currentModalExercise();
+    if(!e) return;
+    resizeImageToDataUrl(file, 900, function(dataUrl){
+      var photos = photosOf(e.id, e.img).slice();
+      if(photoActionMode === "replace"){
+        photos[state.photoIndex] = dataUrl;
+      } else {
+        if(photos.length >= 3){ alert("Puoi avere al massimo 3 foto per esercizio."); return; }
+        photos.push(dataUrl);
+        state.photoIndex = photos.length - 1;
+      }
+      saveExercisePhotos(e.id, photos).then(function(){
+        logAction("Foto esercizio aggiornata", e.nome);
+        showToast("Foto aggiornata.");
+      }).catch(function(err){
+        alert("Non sono riuscito a salvare la foto: " + err.message);
+      });
+    });
+  };
+  document.getElementById("photoRemoveBtn").onclick = function(){
+    var e = currentModalExercise();
+    if(!e) return;
+    if(!confirm("Rimuovere questa foto? Se era l'unica personalizzata, tornera' a essere mostrata quella originale.")) return;
+    var photos = photosOf(e.id, e.img).slice();
+    photos.splice(state.photoIndex, 1);
+    if(state.photoIndex > 0) state.photoIndex--;
+    saveExercisePhotos(e.id, photos).then(function(){
+      logAction("Foto esercizio rimossa", e.nome);
+      showToast("Foto rimossa.");
+    }).catch(function(err){
+      alert("Non sono riuscito a rimuovere la foto: " + err.message);
+    });
+  };
 
   function refreshResetBtn(id){
     var btn = document.getElementById("modalResetBtn");
@@ -1663,6 +1802,21 @@
       rebuildAll();
     }, function(err){
       console.error("Errore sincronizzazione esercizi personalizzati:", err);
+    });
+    exercisePhotosColRef.onSnapshot(function(snap){
+      var map = {};
+      snap.forEach(function(doc){
+        var d = doc.data();
+        if(d.photos && d.photos.length) map[doc.id] = d.photos;
+      });
+      EXERCISE_PHOTOS = map;
+      renderGrid();
+      // se il dettaglio di un esercizio e' aperto, aggiorna anche la sua galleria
+      if(document.getElementById("modalOverlay").classList.contains("open")){
+        renderModalPhoto();
+      }
+    }, function(err){
+      console.error("Errore sincronizzazione foto personalizzate:", err);
     });
 
     firebase.auth().onAuthStateChanged(function(user){
@@ -2618,7 +2772,7 @@
     return Array.from(state.selected).map(function(id){
       var e = byId[id];
       if(!e) return null;
-      return { imgSrc: e.img || "", nome: e.nome, quantita: e.quantita, descrizione: e.descrizione };
+      return { imgSrc: photosOf(id, e.img)[0] || "", nome: e.nome, quantita: e.quantita, descrizione: e.descrizione };
     }).filter(Boolean);
   }
 
