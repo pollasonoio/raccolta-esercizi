@@ -354,6 +354,7 @@
   /* ---------- MODALITA' EDITOR (catalogo condiviso via Firebase) ---------- */
   .editor-only{display:none;}
   .is-editor .editor-only{display:inline-flex;}
+  .is-editor .editor-only.tags-editor-block{display:block;}
   .editor-only.block-when-on{display:none;}
   .is-editor .editor-only.block-when-on{display:block;}
 
@@ -724,7 +725,7 @@
       <textarea id="modalDescrInput" class="edit-descr" rows="4" placeholder="Descrivi come si esegue l'esercizio..."></textarea>
 
       <div class="modal-tags" id="modalManualTags"></div>
-      <div class="editor-only">
+      <div class="editor-only tags-editor-block">
         <label class="field-label" for="modalTagsInput">Tag di ricerca (separati da spazio)</label>
         <input type="text" id="modalTagsInput" class="edit-quant" placeholder="Es. #bilanciere #manubri #elastico">
       </div>
@@ -1007,7 +1008,14 @@
   var SHARED_MODE = /#s=/.test(location.hash || "");
   if(SHARED_MODE) document.body.classList.add("shared-mode");
 
-  var FIRESTORE_OVERRIDES = {deletedIds: [], folders: {}, moves: {}, customExercises: [], treeRenames: {}, customFolders: [], tags: {}};
+  var FIRESTORE_OVERRIDES = {deletedIds: [], folders: {}, moves: {}, treeRenames: {}, customFolders: [], tags: {}};
+  // Gli esercizi aggiunti a mano (con le loro eventuali foto) vivono in una
+  // collezione separata (un documento Firestore per esercizio, non piu' tutti
+  // ammassati nell'unico documento overrides/catalog): cosi' le foto non
+  // rischiano di far superare il limite di 1MB condiviso da tutte le altre
+  // modifiche (eliminazioni, tag, cartelle, rinomine).
+  var CUSTOM_EXERCISES = [];
+  var customExercisesColRef = (typeof FIREBASE_ENABLED !== "undefined" && FIREBASE_ENABLED) ? firebase.firestore().collection("customExercises") : null;
 
   var BASE_EXERCISES = EXERCISES;
   var CURRENT_EXERCISES = BASE_EXERCISES;
@@ -1382,6 +1390,8 @@
     if(cleaned) tagsMap[id] = cleaned; else delete tagsMap[id];
     saveOverridesToFirestore({tags: tagsMap}).then(function(){
       logAction("Modificati tag", cleaned || "(rimossi)");
+      flashSaved("Tag salvati.");
+      showToast("Tag salvati.");
     }).catch(function(err){
       alert("Non sono riuscito a salvare i tag: " + err.message);
     });
@@ -1390,7 +1400,8 @@
   modalTagsInputEl.addEventListener("input", function(){
     clearTimeout(tagsSaveTimer);
     var id = state.modalList[state.modalIndex];
-    tagsSaveTimer = setTimeout(function(){ saveTagsFor(id, modalTagsInputEl.value); }, 700);
+    var val = modalTagsInputEl.value;
+    tagsSaveTimer = setTimeout(function(){ saveTagsFor(id, val); }, 700);
   });
   modalTagsInputEl.addEventListener("blur", function(){
     clearTimeout(tagsSaveTimer);
@@ -1488,7 +1499,7 @@
         list.push(copy);
       });
     });
-    (FIRESTORE_OVERRIDES.customExercises || []).forEach(function(ce){
+    CUSTOM_EXERCISES.forEach(function(ce){
       if(deleted[String(ce.id)]) return;
       locationsFor(ce.id, ce.area, ce.path || []).forEach(function(loc){
         var r = applyRename(loc.area, loc.path || []);
@@ -1633,7 +1644,6 @@
         deletedIds: data.deletedIds || [],
         folders: data.folders || {},
         moves: data.moves || {},
-        customExercises: data.customExercises || [],
         treeRenames: data.treeRenames || {},
         customFolders: data.customFolders || [],
         tags: data.tags || {}
@@ -1641,6 +1651,18 @@
       rebuildAll();
     }, function(err){
       console.error("Errore sincronizzazione catalogo condiviso:", err);
+    });
+    customExercisesColRef.onSnapshot(function(snap){
+      var list = [];
+      snap.forEach(function(doc){
+        var d = doc.data();
+        d.id = doc.id;
+        list.push(d);
+      });
+      CUSTOM_EXERCISES = list;
+      rebuildAll();
+    }, function(err){
+      console.error("Errore sincronizzazione esercizi personalizzati:", err);
     });
 
     firebase.auth().onAuthStateChanged(function(user){
@@ -1678,18 +1700,16 @@
     var e = byId[id];
     if(!e) return;
     if(!confirm('Eliminare definitivamente l\'esercizio "' + e.nome + '"? Sara\' rimosso per tutti.')) return;
-    var newDeleted = (FIRESTORE_OVERRIDES.deletedIds || []).slice();
-    if(newDeleted.indexOf(id) === -1) newDeleted.push(id);
-    // se era un esercizio aggiunto dall'editor (id stringa "c_..."), lo togliamo
-    // direttamente dall'elenco invece di aggiungerlo alla lista eliminati
-    var isCustom = (FIRESTORE_OVERRIDES.customExercises||[]).some(function(c){ return c.id === id; });
-    var patch = {};
+    var isCustom = CUSTOM_EXERCISES.some(function(c){ return c.id === id; });
+    var action;
     if(isCustom){
-      patch.customExercises = (FIRESTORE_OVERRIDES.customExercises||[]).filter(function(c){ return c.id !== id; });
+      action = customExercisesColRef.doc(id).delete();
     } else {
-      patch.deletedIds = newDeleted;
+      var newDeleted = (FIRESTORE_OVERRIDES.deletedIds || []).slice();
+      if(newDeleted.indexOf(id) === -1) newDeleted.push(id);
+      action = saveOverridesToFirestore({deletedIds: newDeleted});
     }
-    saveOverridesToFirestore(patch).then(function(){
+    action.then(function(){
       showToast('Esercizio "' + e.nome + '" eliminato.');
       closeModal();
     }).catch(function(err){
@@ -1763,26 +1783,26 @@
     }
     if(checked.length===0){ errEl.textContent = "Seleziona almeno una cartella (o aggiungine una nuova)."; return; }
 
-    var isCustom = (FIRESTORE_OVERRIDES.customExercises||[]).some(function(c){ return c.id === id; });
-    var patch = {};
+    var isCustom = CUSTOM_EXERCISES.some(function(c){ return c.id === id; });
+    var action;
     if(isCustom){
-      patch.customExercises = (FIRESTORE_OVERRIDES.customExercises||[]).map(function(c){
-        if(c.id !== id) return c;
-        var copy = {}; for(var k in c){ copy[k] = c[k]; }
-        copy.area = checked[0].area; copy.path = checked[0].path;
-        return copy;
-      });
+      var updateData = {area: checked[0].area, path: checked[0].path};
       if(checked.length > 1){
         var foldersMap1 = {}; for(var k in (FIRESTORE_OVERRIDES.folders||{})) foldersMap1[k] = FIRESTORE_OVERRIDES.folders[k];
         foldersMap1[id] = checked;
-        patch.folders = foldersMap1;
+        action = Promise.all([
+          customExercisesColRef.doc(id).update(updateData),
+          saveOverridesToFirestore({folders: foldersMap1})
+        ]);
+      } else {
+        action = customExercisesColRef.doc(id).update(updateData);
       }
     } else {
       var foldersMap = {}; for(var k2 in (FIRESTORE_OVERRIDES.folders||{})) foldersMap[k2] = FIRESTORE_OVERRIDES.folders[k2];
       foldersMap[id] = checked;
-      patch.folders = foldersMap;
+      action = saveOverridesToFirestore({folders: foldersMap});
     }
-    saveOverridesToFirestore(patch).then(function(){
+    action.then(function(){
       showToast("Cartelle aggiornate (" + checked.length + (checked.length===1?" cartella":" cartelle") + ").");
       document.getElementById("foldersOverlay").classList.remove("open");
       closeModal();
@@ -1908,12 +1928,10 @@
     function finalize(imgDataUrl){
       var newId = "c_" + Date.now().toString(36) + Math.random().toString(36).slice(2,8);
       var newEx = {
-        id: newId, area: area, path: pathArr, nome: nome,
+        area: area, path: pathArr, nome: nome,
         descrizione: descr, quantita: quant, img: imgDataUrl || ""
       };
-      var list = (FIRESTORE_OVERRIDES.customExercises || []).slice();
-      list.push(newEx);
-      saveOverridesToFirestore({customExercises: list}).then(function(){
+      customExercisesColRef.doc(newId).set(newEx).then(function(){
         showToast('Esercizio "' + nome + '" aggiunto.');
         document.getElementById("addExerciseOverlay").classList.remove("open");
       }).catch(function(err){
