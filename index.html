@@ -1348,6 +1348,7 @@
 
       var bulkBox = document.createElement("div");
       bulkBox.className = "bulk-check-box" + (state.bulkSelected.has(e.id) ? " checked":"");
+      bulkBox.style.display = state.bulkMode ? "flex" : "none";
       bulkBox.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>';
       bulkBox.onclick = function(ev){
         ev.stopPropagation();
