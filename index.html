@@ -196,6 +196,29 @@
   .star-btn.active svg{color:#fff;}
   .no-results{color:var(--text-muted); padding:40px 0; text-align:center; font-size:14px;}
 
+  /* ---------- SELEZIONE MULTIPLA IN GRIGLIA (solo editor) ---------- */
+  .bulk-check-box{
+    display:none; position:absolute; top:8px; left:8px; z-index:2;
+    width:24px; height:24px; border-radius:7px; background:rgba(255,255,255,.92);
+    border:2px solid var(--border); align-items:center; justify-content:center; cursor:pointer;
+  }
+  .is-editor.bulk-mode-on .bulk-check-box{display:flex;}
+  .bulk-check-box svg{width:14px; height:14px; color:transparent;}
+  .bulk-check-box.checked{background:var(--accent-dark); border-color:var(--accent-dark);}
+  .bulk-check-box.checked svg{color:#fff;}
+  .card.bulk-selected{outline:2px solid var(--accent-dark); outline-offset:-2px;}
+  .bulk-action-bar{
+    position:fixed; left:50%; bottom:22px; transform:translateX(-50%) translateY(120%);
+    background:#1f2933; color:#fff; border-radius:14px; padding:12px 16px;
+    display:flex; align-items:center; gap:12px; box-shadow:0 12px 30px rgba(0,0,0,.3);
+    z-index:150; transition:transform .2s; font-size:13.5px;
+  }
+  .bulk-action-bar.open{transform:translateX(-50%) translateY(0);}
+  .bulk-action-bar .bulk-count{font-weight:700; padding-right:6px;}
+  .bulk-action-bar .btn{padding:7px 12px; font-size:12.5px;}
+  .bulk-action-bar .btn.ghost{background:transparent; color:#fff; border-color:rgba(255,255,255,.4);}
+  .bulk-action-bar .btn.ghost:hover{background:rgba(255,255,255,.12);}
+
   /* ---------- MODAL ---------- */
   .modal-overlay{
     position:fixed; inset:0; background:rgba(20,25,30,.55);
@@ -677,6 +700,29 @@
 
 <div class="global-toast" id="globalToast"></div>
 
+<div class="bulk-action-bar" id="bulkActionBar">
+  <span class="bulk-count" id="bulkCount">0 selezionati</span>
+  <button class="btn" id="bulkMoveBtn">Sposta in...</button>
+  <button class="btn danger" id="bulkDeleteBtn">Elimina</button>
+  <button class="btn ghost" id="bulkCancelBtn">Annulla</button>
+</div>
+
+<!-- SPOSTA ESERCIZI SELEZIONATI IN BLOCCO -->
+<div class="simple-modal-overlay" id="bulkMoveOverlay">
+  <div class="simple-modal wide">
+    <h3 id="bulkMoveTitle">Sposta esercizi selezionati</h3>
+    <p style="margin:0 0 10px; font-size:12.5px; color:var(--text-muted);">Scegli la cartella di destinazione per tutti gli esercizi selezionati (sostituisce la loro posizione attuale).</p>
+    <div class="folder-check-list" id="bulkMoveTreeList"></div>
+    <label for="bulkMoveNewTxt" style="margin-top:14px;">Oppure scrivi una destinazione nuova</label>
+    <input type="text" id="bulkMoveNewTxt" placeholder='Es. Arto Inferiore/Ginocchio'>
+    <div class="err-text" id="bulkMoveError"></div>
+    <div class="modal-actions">
+      <button class="btn" id="bulkMoveCancelBtn">Annulla</button>
+      <button class="btn primary" id="bulkMoveSubmitBtn">Sposta qui</button>
+    </div>
+  </div>
+</div>
+
 <header>
   <h1>Raccolta Esercizi</h1>
   <div class="search-wrap">
@@ -692,6 +738,7 @@
   <button class="btn editor-only" id="editTreeBtn">Nuova cartella</button>
   <button class="btn editor-only" id="manageTemplatesBtn">Modelli</button>
   <button class="btn editor-only" id="openLogBtn">Cronologia</button>
+  <button class="btn editor-only" id="bulkModeBtn">Seleziona</button>
   <div class="account-badge" id="accountBadge" style="display:none;">
     <span id="accountName"></span>
     <button class="btn" id="accountLogoutBtn" title="Esci">
@@ -1015,7 +1062,9 @@
     query: "",
     selected: loadSelected(),   // Set di id in scheda
     modalList: [],     // lista id correnti nel modal (per navigazione prev/next)
-    modalIndex: -1
+    modalIndex: -1,
+    bulkMode: false,          // modalita' selezione multipla (solo editor)
+    bulkSelected: new Set()   // id selezionati in modalita' multipla
   };
 
   function loadSelected(){
@@ -1297,6 +1346,15 @@
       };
       card.appendChild(star);
 
+      var bulkBox = document.createElement("div");
+      bulkBox.className = "bulk-check-box editor-only" + (state.bulkSelected.has(e.id) ? " checked":"");
+      bulkBox.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>';
+      bulkBox.onclick = function(ev){
+        ev.stopPropagation();
+        toggleBulkSelected(e.id, card, bulkBox);
+      };
+      card.appendChild(bulkBox);
+
       var thumb = document.createElement("div");
       thumb.className = "thumb";
       var thumbSrc = photosOf(e.id, e.img)[0];
@@ -1323,8 +1381,10 @@
       }
       card.appendChild(body);
 
+      if(state.bulkSelected.has(e.id)) card.classList.add("bulk-selected");
       card.onclick = function(){
         if(card.dataset.justDragged) return;
+        if(state.bulkMode){ toggleBulkSelected(e.id, card, bulkBox); return; }
         openModal(e.id, list.map(function(x){return x.id;}));
       };
       startCardDragTracking(card, e);
@@ -1332,7 +1392,117 @@
       frag.appendChild(card);
     });
     grid.appendChild(frag);
+    updateBulkBar();
   }
+
+  function toggleBulkSelected(id, card, bulkBox){
+    if(state.bulkSelected.has(id)) state.bulkSelected.delete(id);
+    else state.bulkSelected.add(id);
+    card.classList.toggle("bulk-selected", state.bulkSelected.has(id));
+    bulkBox.classList.toggle("checked", state.bulkSelected.has(id));
+    updateBulkBar();
+  }
+
+  // ---------- SELEZIONE MULTIPLA IN GRIGLIA (solo editor) ----------
+  document.getElementById("bulkModeBtn").onclick = function(){
+    state.bulkMode = !state.bulkMode;
+    document.body.classList.toggle("bulk-mode-on", state.bulkMode);
+    document.getElementById("bulkModeBtn").textContent = state.bulkMode ? "Fine selezione" : "Seleziona";
+    if(!state.bulkMode) state.bulkSelected.clear();
+    renderGrid();
+  };
+  function updateBulkBar(){
+    var bar = document.getElementById("bulkActionBar");
+    var n = state.bulkSelected.size;
+    bar.classList.toggle("open", state.bulkMode && n > 0);
+    document.getElementById("bulkCount").textContent = n + (n===1 ? " selezionato" : " selezionati");
+  }
+  document.getElementById("bulkCancelBtn").onclick = function(){
+    state.bulkSelected.clear();
+    renderGrid();
+  };
+  document.getElementById("bulkDeleteBtn").onclick = function(){
+    var ids = Array.from(state.bulkSelected);
+    if(ids.length===0) return;
+    if(!confirm("Eliminare definitivamente " + ids.length + " esercizi selezionati? Saranno rimossi per tutti.")) return;
+    var customIds = ids.filter(function(id){ return CUSTOM_EXERCISES.some(function(c){ return c.id === id; }); });
+    var baseIds = ids.filter(function(id){ return customIds.indexOf(id) === -1; });
+    var tasks = customIds.map(function(id){ return customExercisesColRef.doc(id).delete(); });
+    if(baseIds.length){
+      var newDeleted = (FIRESTORE_OVERRIDES.deletedIds || []).slice();
+      baseIds.forEach(function(id){ if(newDeleted.indexOf(id)===-1) newDeleted.push(id); });
+      tasks.push(saveOverridesToFirestore({deletedIds: newDeleted}));
+    }
+    Promise.all(tasks).then(function(){
+      logAction("Eliminati esercizi in blocco", ids.length + " esercizi");
+      showToast(ids.length + " esercizi eliminati.");
+      state.bulkSelected.clear();
+      renderGrid();
+    }).catch(function(err){
+      alert("Non sono riuscito a eliminare tutto: " + err.message);
+    });
+  };
+  document.getElementById("bulkMoveBtn").onclick = function(){
+    if(state.bulkSelected.size===0) return;
+    document.getElementById("bulkMoveTitle").textContent = "Sposta " + state.bulkSelected.size + " esercizi selezionati";
+    document.getElementById("bulkMoveNewTxt").value = "";
+    document.getElementById("bulkMoveError").textContent = "";
+    var container = document.getElementById("bulkMoveTreeList");
+    container.innerHTML = "";
+    flattenTreeForChecklist().forEach(function(node){
+      var row = document.createElement("label");
+      row.className = "folder-check-row";
+      row.style.paddingLeft = (node.depth * 16) + "px";
+      var radio = document.createElement("input");
+      radio.type = "radio"; radio.name = "bulkMoveDest";
+      radio.dataset.area = node.area; radio.dataset.path = JSON.stringify(node.path);
+      row.appendChild(radio);
+      var lbl = document.createElement("span"); lbl.textContent = node.label; row.appendChild(lbl);
+      var cnt = document.createElement("span"); cnt.className = "fc-count";
+      cnt.textContent = node.count + (node.count===1?" esercizio":" esercizi");
+      row.appendChild(cnt);
+      container.appendChild(row);
+    });
+    document.getElementById("bulkMoveOverlay").classList.add("open");
+  };
+  document.getElementById("bulkMoveCancelBtn").onclick = function(){
+    document.getElementById("bulkMoveOverlay").classList.remove("open");
+  };
+  document.getElementById("bulkMoveSubmitBtn").onclick = function(){
+    var errEl = document.getElementById("bulkMoveError");
+    var newArea, newPath;
+    var newTxt = document.getElementById("bulkMoveNewTxt").value.trim();
+    var checkedRadio = document.querySelector('input[name="bulkMoveDest"]:checked');
+    if(newTxt){
+      var segs = newTxt.split("/").map(function(s){return s.trim();}).filter(Boolean);
+      if(segs.length===0){ errEl.textContent = "Scrivi almeno l'area di destinazione."; return; }
+      newArea = segs[0]; newPath = segs.slice(1);
+    } else if(checkedRadio){
+      newArea = checkedRadio.dataset.area; newPath = JSON.parse(checkedRadio.dataset.path);
+    } else {
+      errEl.textContent = "Scegli una destinazione, oppure scrivine una nuova.";
+      return;
+    }
+    var ids = Array.from(state.bulkSelected);
+    if(!confirm("Spostare " + ids.length + " esercizi sotto \"" + [newArea].concat(newPath).join(" / ") + "\"?")) return;
+    var customIds = ids.filter(function(id){ return CUSTOM_EXERCISES.some(function(c){ return c.id === id; }); });
+    var baseIds = ids.filter(function(id){ return customIds.indexOf(id) === -1; });
+    var tasks = customIds.map(function(id){ return customExercisesColRef.doc(id).update({area: newArea, path: newPath}); });
+    if(baseIds.length){
+      var foldersMap = {}; for(var k in (FIRESTORE_OVERRIDES.folders||{})) foldersMap[k] = FIRESTORE_OVERRIDES.folders[k];
+      baseIds.forEach(function(id){ foldersMap[id] = [{area: newArea, path: newPath}]; });
+      tasks.push(saveOverridesToFirestore({folders: foldersMap}));
+    }
+    Promise.all(tasks).then(function(){
+      logAction("Spostati esercizi in blocco", ids.length + ' esercizi \u2192 "' + [newArea].concat(newPath).join(" / ") + '"');
+      showToast(ids.length + " esercizi spostati.");
+      document.getElementById("bulkMoveOverlay").classList.remove("open");
+      state.bulkSelected.clear();
+      renderGrid();
+    }).catch(function(err){
+      errEl.textContent = "Non sono riuscito a spostare tutto: " + err.message;
+    });
+  };
 
   function toggleSelected(id){
     if(state.selected.has(id)) state.selected.delete(id);
