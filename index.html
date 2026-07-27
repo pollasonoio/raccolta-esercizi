@@ -1426,9 +1426,9 @@
 
   function saveExercisePhotos(id, photos){
     if(photos.length === 0){
-      return exercisePhotosColRef.doc(id).delete();
+      return exercisePhotosColRef.doc(String(id)).delete();
     }
-    return exercisePhotosColRef.doc(id).set({photos: photos});
+    return exercisePhotosColRef.doc(String(id)).set({photos: photos});
   }
 
   var photoActionMode = null; // "replace" oppure "add"
@@ -1777,47 +1777,52 @@
 
   if(FIREBASE_ENABLED && !SHARED_MODE){
     showGate();
-    overridesDocRef.onSnapshot(function(doc){
-      var data = doc.exists ? doc.data() : {};
-      FIRESTORE_OVERRIDES = {
-        deletedIds: data.deletedIds || [],
-        folders: data.folders || {},
-        moves: data.moves || {},
-        treeRenames: data.treeRenames || {},
-        customFolders: data.customFolders || [],
-        tags: data.tags || {}
-      };
-      rebuildAll();
-    }, function(err){
-      console.error("Errore sincronizzazione catalogo condiviso:", err);
-    });
-    customExercisesColRef.onSnapshot(function(snap){
-      var list = [];
-      snap.forEach(function(doc){
-        var d = doc.data();
-        d.id = doc.id;
-        list.push(d);
+    var firestoreListenersStarted = false;
+    function startFirestoreListeners(){
+      if(firestoreListenersStarted) return;
+      firestoreListenersStarted = true;
+      overridesDocRef.onSnapshot(function(doc){
+        var data = doc.exists ? doc.data() : {};
+        FIRESTORE_OVERRIDES = {
+          deletedIds: data.deletedIds || [],
+          folders: data.folders || {},
+          moves: data.moves || {},
+          treeRenames: data.treeRenames || {},
+          customFolders: data.customFolders || [],
+          tags: data.tags || {}
+        };
+        rebuildAll();
+      }, function(err){
+        console.error("Errore sincronizzazione catalogo condiviso:", err);
       });
-      CUSTOM_EXERCISES = list;
-      rebuildAll();
-    }, function(err){
-      console.error("Errore sincronizzazione esercizi personalizzati:", err);
-    });
-    exercisePhotosColRef.onSnapshot(function(snap){
-      var map = {};
-      snap.forEach(function(doc){
-        var d = doc.data();
-        if(d.photos && d.photos.length) map[doc.id] = d.photos;
+      customExercisesColRef.onSnapshot(function(snap){
+        var list = [];
+        snap.forEach(function(doc){
+          var d = doc.data();
+          d.id = doc.id;
+          list.push(d);
+        });
+        CUSTOM_EXERCISES = list;
+        rebuildAll();
+      }, function(err){
+        console.error("Errore sincronizzazione esercizi personalizzati:", err);
       });
-      EXERCISE_PHOTOS = map;
-      renderGrid();
-      // se il dettaglio di un esercizio e' aperto, aggiorna anche la sua galleria
-      if(document.getElementById("modalOverlay").classList.contains("open")){
-        renderModalPhoto();
-      }
-    }, function(err){
-      console.error("Errore sincronizzazione foto personalizzate:", err);
-    });
+      exercisePhotosColRef.onSnapshot(function(snap){
+        var map = {};
+        snap.forEach(function(doc){
+          var d = doc.data();
+          if(d.photos && d.photos.length) map[doc.id] = d.photos;
+        });
+        EXERCISE_PHOTOS = map;
+        renderGrid();
+        // se il dettaglio di un esercizio e' aperto, aggiorna anche la sua galleria
+        if(document.getElementById("modalOverlay").classList.contains("open")){
+          renderModalPhoto();
+        }
+      }, function(err){
+        console.error("Errore sincronizzazione foto personalizzate:", err);
+      });
+    }
 
     firebase.auth().onAuthStateChanged(function(user){
       if(!user){
@@ -1830,6 +1835,11 @@
       }
       currentUserEmail = user.email || "";
       hideGate();
+      // gli ascoltatori partono solo ora: prima del login, le regole di
+      // sicurezza li rifiuterebbero comunque (serve essere autenticati),
+      // e una volta rifiutato un ascoltatore Firestore non si riprova da
+      // solo -- va avviato di nuovo qui, a login avvenuto.
+      startFirestoreListeners();
       loadTemplatesFromFirestore();
       firebase.firestore().collection("roles").doc(user.uid).get().then(function(doc){
         var data = doc.exists ? doc.data() : {};
