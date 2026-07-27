@@ -596,6 +596,24 @@
   .a4-page-number{
     text-align:center; font-size:10.5px; color:#888; margin-top:0.3cm; flex-shrink:0;
   }
+  .a4-signature-wrap{
+    margin-top:0.6cm; padding-top:0.4cm; border-top:1px solid #ddd;
+    display:flex; justify-content:flex-end;
+  }
+  .a4-signature-text{
+    font-family:Georgia,"Times New Roman",serif; text-align:right; line-height:1.35;
+  }
+  .a4-signature-text .sig-line{font-size:13px; color:#222;}
+
+  /* ---------- RIGHE FIRMA FORMATTABILI (modale Gestisci firme) ---------- */
+  .sig-line-row{display:flex; align-items:center; gap:8px; margin-top:8px;}
+  .sig-line-row input[type=text]{flex:1;}
+  .sig-line-row .sig-toggle{
+    flex-shrink:0; width:30px; height:30px; border-radius:7px; border:1px solid var(--border);
+    background:#fff; cursor:pointer; font-size:13px; display:flex; align-items:center; justify-content:center;
+  }
+  .sig-line-row .sig-toggle.on{background:var(--accent-dark); color:#fff; border-color:var(--accent-dark);}
+  .sig-preview{font-family:Georgia,"Times New Roman",serif; text-align:right; line-height:1.35; font-size:12.5px; color:#333;}
 
   /* ---------- FOGLI A4 (usati sia nell'anteprima a schermo, sia in stampa,
      sia nel file HTML che si scarica) ----------
@@ -737,6 +755,7 @@
   </button>
   <button class="btn editor-only" id="editTreeBtn">Nuova cartella</button>
   <button class="btn editor-only" id="manageTemplatesBtn">Modelli</button>
+  <button class="btn editor-only" id="manageSignaturesBtn">Firme</button>
   <button class="btn editor-only" id="openLogBtn">Cronologia</button>
   <button class="btn editor-only" id="bulkModeBtn">Seleziona</button>
   <div class="account-badge" id="accountBadge" style="display:none;">
@@ -855,6 +874,10 @@
     <div>
       <label>Modello / carta intestata</label>
       <select id="fTemplate"></select>
+    </div>
+    <div>
+      <label>Firma a fine scheda</label>
+      <select id="fSignature"></select>
     </div>
   </div>
   <div class="drawer-list" id="drawerList"></div>
@@ -1025,6 +1048,29 @@
       <div class="err-text" id="templatesError"></div>
       <div class="modal-actions">
         <button class="btn primary" id="uploadTplBtn">Carica modello</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- GESTISCI FIRME -->
+<div class="lib-overlay" id="signaturesOverlay">
+  <div class="lib-modal">
+    <div class="lib-head">
+      <h3>Firme</h3>
+      <button class="close-x" id="signaturesClose" style="position:static;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="lib-body">
+      <div id="signaturesList"></div>
+      <h4 style="margin:18px 0 8px; font-size:14px;">Crea una nuova firma</h4>
+      <label for="newSigNome">Nome di questa firma (per ritrovarla nell'elenco)</label>
+      <input type="text" id="newSigNome" placeholder="Es. Dott. Rossi">
+      <div id="newSigLines"></div>
+      <div class="err-text" id="signaturesError"></div>
+      <div class="modal-actions">
+        <button class="btn primary" id="uploadSigBtn">Salva firma</button>
       </div>
     </div>
   </div>
@@ -2012,6 +2058,7 @@
       // solo -- va avviato di nuovo qui, a login avvenuto.
       startFirestoreListeners();
       loadTemplatesFromFirestore();
+      loadSignaturesFromFirestore();
       firebase.firestore().collection("roles").doc(user.uid).get().then(function(doc){
         var data = doc.exists ? doc.data() : {};
         isEditor = data.role === "editor";
@@ -2435,7 +2482,153 @@
     }
   };
 
-  // ---------- TOAST GLOBALE DI CONFERMA ----------
+  // ---------- FIRME A FINE SCHEDA (testo formattato, fino a 3 righe) ----------
+  var SIGNATURES_CACHE = [];
+  var signaturesColRef = (typeof FIREBASE_ENABLED !== "undefined" && FIREBASE_ENABLED) ? firebase.firestore().collection("signatures") : null;
+  function allSignatures(){
+    return [{id: "__none__", nome: "Nessuna firma", lines: []}].concat(SIGNATURES_CACHE);
+  }
+  function populateSignatureSelect(selectedId){
+    var sel = document.getElementById("fSignature");
+    var prev = selectedId || sel.value || "__none__";
+    sel.innerHTML = "";
+    allSignatures().forEach(function(s){
+      var opt = document.createElement("option");
+      opt.value = s.id; opt.textContent = s.nome;
+      sel.appendChild(opt);
+    });
+    sel.value = prev;
+    if(sel.selectedIndex < 0) sel.value = "__none__";
+  }
+  function signatureById(id){
+    return allSignatures().filter(function(s){ return s.id === id; })[0] || allSignatures()[0];
+  }
+  // Costruisce l'HTML delle righe di firma (usato sia nell'app sia nel file esportato)
+  function signatureLinesHtml(lines){
+    return (lines || []).filter(function(l){ return l && l.text; }).map(function(l){
+      var style = (l.bold?"font-weight:700;":"") + (l.italic?"font-style:italic;":"");
+      return '<div class="sig-line" style="' + style + '">' + escapeHtml(l.text) + '</div>';
+    }).join("");
+  }
+  function loadSignaturesFromFirestore(){
+    if(!FIREBASE_ENABLED) return;
+    signaturesColRef.orderBy("createdAt", "asc").get().then(function(snap){
+      SIGNATURES_CACHE = [];
+      snap.forEach(function(doc){
+        var d = doc.data();
+        SIGNATURES_CACHE.push({id: doc.id, nome: d.nome, lines: d.lines || []});
+      });
+      populateSignatureSelect();
+      if(document.getElementById("signaturesOverlay").classList.contains("open")) renderSignaturesList();
+    }).catch(function(err){ console.error("Errore caricamento firme:", err); });
+  }
+  function renderSignaturesList(){
+    var box = document.getElementById("signaturesList");
+    box.innerHTML = "";
+    if(SIGNATURES_CACHE.length === 0){
+      box.innerHTML = '<div class="lib-empty">Nessuna firma salvata finora.</div>';
+      return;
+    }
+    SIGNATURES_CACHE.forEach(function(s){
+      var row = document.createElement("div");
+      row.className = "lib-card";
+      var info = document.createElement("div");
+      info.className = "lc-info";
+      var nameEl = document.createElement("div");
+      nameEl.className = "lc-name"; nameEl.textContent = s.nome;
+      info.appendChild(nameEl);
+      var preview = document.createElement("div");
+      preview.className = "sig-preview";
+      preview.innerHTML = signatureLinesHtml(s.lines);
+      info.appendChild(preview);
+      row.appendChild(info);
+      var actions = document.createElement("div");
+      actions.className = "lc-actions";
+      var del = document.createElement("button");
+      del.className = "btn danger"; del.textContent = "Elimina";
+      del.onclick = function(){
+        if(!confirm('Eliminare la firma "'+s.nome+'"?')) return;
+        signaturesColRef.doc(s.id).delete().then(function(){
+          logAction("Eliminata firma", s.nome);
+          loadSignaturesFromFirestore();
+        }).catch(function(err){ alert("Errore: " + err.message); });
+      };
+      actions.appendChild(del);
+      row.appendChild(actions);
+      box.appendChild(row);
+    });
+  }
+  // Le 3 righe editabili (testo + grassetto/corsivo) nel modulo "Crea una nuova firma"
+  function buildSigLineRows(){
+    var container = document.getElementById("newSigLines");
+    container.innerHTML = "";
+    for(var i=0;i<3;i++){
+      var row = document.createElement("div");
+      row.className = "sig-line-row";
+      var input = document.createElement("input");
+      input.type = "text";
+      input.className = "sig-line-input";
+      input.placeholder = i===0 ? "Es. Dott.ssa Paola Rossi" : (i===1 ? "Es. paola@centrodimedicina.com (facoltativo)" : "Es. 0422 698 111 (facoltativo)");
+      row.appendChild(input);
+      var boldBtn = document.createElement("button");
+      boldBtn.type = "button"; boldBtn.className = "sig-toggle"; boldBtn.title = "Grassetto";
+      boldBtn.innerHTML = "<b>B</b>";
+      boldBtn.onclick = function(ev){ ev.preventDefault(); this.classList.toggle("on"); };
+      row.appendChild(boldBtn);
+      var italicBtn = document.createElement("button");
+      italicBtn.type = "button"; italicBtn.className = "sig-toggle"; italicBtn.title = "Corsivo";
+      italicBtn.innerHTML = "<i>I</i>";
+      italicBtn.onclick = function(ev){ ev.preventDefault(); this.classList.toggle("on"); };
+      row.appendChild(italicBtn);
+      container.appendChild(row);
+    }
+  }
+  document.getElementById("manageSignaturesBtn").onclick = function(){
+    if(!isEditor) return;
+    document.getElementById("newSigNome").value = "";
+    buildSigLineRows();
+    document.getElementById("signaturesError").textContent = "";
+    renderSignaturesList();
+    document.getElementById("signaturesOverlay").classList.add("open");
+  };
+  document.getElementById("signaturesClose").onclick = function(){
+    document.getElementById("signaturesOverlay").classList.remove("open");
+  };
+  document.getElementById("uploadSigBtn").onclick = function(){
+    var nome = document.getElementById("newSigNome").value.trim();
+    var errEl = document.getElementById("signaturesError");
+    if(!nome){ errEl.textContent = "Dai un nome a questa firma (per ritrovarla nell'elenco)."; return; }
+    var rows = document.querySelectorAll("#newSigLines .sig-line-row");
+    var lines = [];
+    rows.forEach(function(row){
+      var text = row.querySelector(".sig-line-input").value.trim();
+      if(!text) return;
+      var toggles = row.querySelectorAll(".sig-toggle");
+      lines.push({ text: text, bold: toggles[0].classList.contains("on"), italic: toggles[1].classList.contains("on") });
+    });
+    if(lines.length === 0){ errEl.textContent = "Scrivi almeno una riga di testo."; return; }
+    var btn = document.getElementById("uploadSigBtn");
+    btn.disabled = true;
+    errEl.textContent = "Salvataggio in corso...";
+    var sigId = "s_" + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+    signaturesColRef.doc(sigId).set({
+      nome: nome, lines: lines,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    }).then(function(){
+      logAction("Nuova firma", nome);
+      errEl.textContent = "";
+      document.getElementById("newSigNome").value = "";
+      buildSigLineRows();
+      loadSignaturesFromFirestore();
+      showToast('Firma "' + nome + '" salvata.');
+    }).catch(function(err){
+      errEl.textContent = "Errore durante il salvataggio: " + err.message;
+    }).finally(function(){
+      btn.disabled = false;
+    });
+  };
+
+
   var toastTimer = null;
   function showToast(msg){
     var el = document.getElementById("globalToast");
@@ -2802,6 +2995,10 @@
   populateTemplateSelect(loadField("raccolta_esercizi_template", "__default__"));
   fTemplate.onchange = function(){ saveField("raccolta_esercizi_template", fTemplate.value); };
 
+  var fSignature = document.getElementById("fSignature");
+  populateSignatureSelect(loadField("raccolta_esercizi_signature", "__none__"));
+  fSignature.onchange = function(){ saveField("raccolta_esercizi_signature", fSignature.value); };
+
   // ---------- FOGLI A4 (anteprima, stampa e file scaricato) ----------
   // Le proporzioni dell'intestazione e del piede pagina (altezza/larghezza)
   // vengono dalle immagini PNG originali della carta intestata: servono per
@@ -2846,7 +3043,7 @@
   // se gli esercizi non entrano in uno, se ne genera un altro identico,
   // cosi' la scheda resta sempre in formato A4 a prescindere da quanti
   // esercizi contiene. items = [{imgSrc, nome, quantita, descrizione}, ...].
-  function buildA4Sheets(container, headerSrc, footerSrc, paziente, dataVal, note, items){
+  function buildA4Sheets(container, headerSrc, footerSrc, paziente, dataVal, note, items, signatureLines){
     container.innerHTML = "";
 
     var contentWCm = 21 - 2*2; // 17cm: larghezza foglio meno margini laterali (2cm ciascuno)
@@ -2858,7 +3055,14 @@
     // calcolo a schermo e la resa in stampa creino una pagina aggiuntiva
     // quasi vuota per un trabocco di pochi millimetri
     var pageNumH = cmToPx(0.6);
-    var avail = pageInnerHPx - headerHPx - footerHPx - pageNumH - cmToPx(0.9);
+    // se e' stata scelta una firma, riservo uno spazio prudente su ogni
+    // pagina (piu' semplice e sicuro che calcolarlo solo per l'ultima,
+    // al costo di qualche riga in meno per foglio quando e' selezionata):
+    // e' testo, quindi bastano poche righe (~0.55cm l'una) invece dello
+    // spazio che serviva per un'immagine
+    var hasSignature = signatureLines && signatureLines.length;
+    var signatureHPx = hasSignature ? cmToPx(0.5 + signatureLines.length * 0.55) : 0;
+    var avail = pageInnerHPx - headerHPx - footerHPx - pageNumH - signatureHPx - cmToPx(0.9);
 
     // "probe" invisibile per misurare l'altezza reale del titolo e di ogni esercizio
     var probe = document.createElement("div");
@@ -2923,6 +3127,15 @@
       if(pg.isFirst) bodyHtml += titleHtml;
       pg.items.forEach(function(i){ bodyHtml += itemHtmls[i]; });
       body.innerHTML = bodyHtml;
+      if(hasSignature && pgIndex === totalPages - 1){
+        var sigWrap = document.createElement("div");
+        sigWrap.className = "a4-signature-wrap";
+        var sigText = document.createElement("div");
+        sigText.className = "a4-signature-text";
+        sigText.innerHTML = signatureLinesHtml(signatureLines);
+        sigWrap.appendChild(sigText);
+        body.appendChild(sigWrap);
+      }
       sheet.appendChild(body);
 
       if(totalPages > 1){
@@ -2960,10 +3173,11 @@
   var originalDocTitle = document.title;
   function printCurrentScheda(){
     var tpl = templateById(fTemplate.value);
+    var sig = signatureById(fSignature.value);
     buildA4Sheets(
       document.getElementById("printPages"), tpl.headerUrl, tpl.footerUrl,
       fPaziente.value, fData.value || new Date().toLocaleDateString("it-IT"),
-      fNote.value, currentItemsForPrint()
+      fNote.value, currentItemsForPrint(), sig.lines
     );
     document.title = schedaFilename(fPaziente.value).replace(/\.html$/, "");
     window.print();
@@ -2997,10 +3211,11 @@
 
   function buildPreview(){
     var tpl = templateById(fTemplate.value);
+    var sig = signatureById(fSignature.value);
     buildA4Sheets(
       document.getElementById("previewPages"), tpl.headerUrl, tpl.footerUrl,
       fPaziente.value, fData.value || new Date().toLocaleDateString("it-IT"),
-      fNote.value, currentItemsForPrint()
+      fNote.value, currentItemsForPrint(), sig.lines
     );
   }
 
@@ -3091,6 +3306,9 @@
     var tpl = templateById(templateId);
     var headerSrc = await urlToDataUrl(tpl.headerUrl);
     var footerSrc = await urlToDataUrl(tpl.footerUrl);
+    var signatureId = (override && override.signatureId) ? override.signatureId : (fSignature.value || "__none__");
+    var sig = signatureById(signatureId);
+    var signatureLines = sig.lines || [];
     var paziente = (override && override.paziente !== undefined) ? override.paziente : (fPaziente.value || "");
     var dataVal = (override && override.dataVal) ? override.dataVal : (fData.value || new Date().toLocaleDateString("it-IT"));
     var note = (override && override.note !== undefined) ? override.note : (fNote.value || "");
@@ -3113,7 +3331,7 @@
 
     var title = "Scheda esercizi" + (paziente ? " - " + paziente : "") + " - " + dataVal;
     var dataJson = JSON.stringify({
-      headerSrc: headerSrc, footerSrc: footerSrc,
+      headerSrc: headerSrc, footerSrc: footerSrc, signatureLines: signatureLines,
       paziente: paziente, dataVal: dataVal, note: note, items: items
     });
 
@@ -3138,6 +3356,9 @@
       '.print-item p{margin:0;font-size:12px;color:#333;line-height:1.4;}' +
       '.print-item .pnotes{margin-top:6px;font-size:11.5px;color:#888;border-top:1px dashed #ccc;padding-top:4px;}' +
       '.a4-page-number{text-align:center;font-size:10.5px;color:#888;margin-top:0.3cm;flex-shrink:0;}' +
+      '.a4-signature-wrap{margin-top:0.6cm;padding-top:0.4cm;border-top:1px solid #ddd;display:flex;justify-content:flex-end;}' +
+      '.a4-signature-text{font-family:Georgia,"Times New Roman",serif;text-align:right;line-height:1.35;}' +
+      '.a4-signature-text .sig-line{font-size:13px;color:#222;}' +
       '@page{size:A4;margin:0;}' +
       '@media print{' +
         'body{background:#fff;padding:0;}' +
@@ -3154,14 +3375,17 @@
       'function cmToPx(cm){if(_cmPx===null){var p=document.createElement("div");p.style.cssText="position:absolute;visibility:hidden;height:0;width:100cm;";document.body.appendChild(p);_cmPx=p.getBoundingClientRect().width/100;document.body.removeChild(p);if(!_cmPx)_cmPx=37.7952755906;}return cm*_cmPx;}' +
       'function buildItemHtml(imgSrc,nome,quantita,descrizione){return \'<div class="print-item">\'+\'<div class="pi-thumb">\'+(imgSrc?\'<img src="\'+escapeHtml(imgSrc)+\'" alt="">\':"")+\'</div>\'+\'<div class="pi-text"><h4>\'+escapeHtml(nome)+\'</h4>\'+(quantita?\'<div class="pq">\'+escapeHtml(quantita)+\'</div>\':"")+\'<p>\'+escapeHtml(descrizione||"")+\'</p>\'+\'<div class="pnotes">Note: ______________________________________________</div>\'+\'</div></div>\';}' +
       'function buildTitleHtml(paziente,dataVal,note){return \'<div class="print-head"><h1>Scheda esercizi</h1><div class="print-meta">\'+(paziente?\'<span>Paziente: \'+escapeHtml(paziente)+\'</span>\':"")+\'<span>Data: \'+escapeHtml(dataVal)+\'</span></div>\'+(note?\'<div class="print-note">\'+escapeHtml(note)+\'</div>\':"")+\'</div>\';}' +
-      'function buildA4Sheets(container,headerSrc,footerSrc,paziente,dataVal,note,items){' +
+      'function signatureLinesHtml(lines){return (lines||[]).filter(function(l){return l && l.text;}).map(function(l){var style=(l.bold?"font-weight:700;":"")+(l.italic?"font-style:italic;":"");return \'<div class="sig-line" style="\'+style+\'">\'+escapeHtml(l.text)+\'</div>\';}).join("");}' +
+      'function buildA4Sheets(container,headerSrc,footerSrc,paziente,dataVal,note,items,signatureLines){' +
         'container.innerHTML="";' +
         'var contentWCm=21-2*2;var contentWPx=cmToPx(contentWCm);' +
         'var pageInnerHPx=cmToPx(29.7-2*1);' +
         'var headerHPx=cmToPx(contentWCm*0.0959)+cmToPx(0.5);' +
         'var footerHPx=cmToPx(contentWCm*0.0690)+cmToPx(0.5);' +
         'var pageNumH=cmToPx(0.6);' +
-        'var avail=pageInnerHPx-headerHPx-footerHPx-pageNumH-cmToPx(0.9);' +
+        'var hasSignature=signatureLines && signatureLines.length;' +
+        'var signatureHPx=hasSignature?cmToPx(0.5+signatureLines.length*0.55):0;' +
+        'var avail=pageInnerHPx-headerHPx-footerHPx-pageNumH-signatureHPx-cmToPx(0.9);' +
         'var probe=document.createElement("div");' +
         'probe.style.cssText="position:absolute;left:-99999px;top:0;width:"+contentWPx+"px;visibility:hidden;";' +
         'document.body.appendChild(probe);' +
@@ -3181,14 +3405,16 @@
           'var sheet=document.createElement("div");sheet.className="a4-sheet";' +
           'var hi=document.createElement("img");hi.className="a4-header";hi.src=headerSrc;hi.alt="Centro di medicina";sheet.appendChild(hi);' +
           'var body=document.createElement("div");body.className="a4-body";' +
-          'var bodyHtml="";if(pg.isFirst)bodyHtml+=titleHtml;pg.items.forEach(function(i){bodyHtml+=itemHtmls[i];});body.innerHTML=bodyHtml;sheet.appendChild(body);' +
+          'var bodyHtml="";if(pg.isFirst)bodyHtml+=titleHtml;pg.items.forEach(function(i){bodyHtml+=itemHtmls[i];});body.innerHTML=bodyHtml;' +
+          'if(hasSignature && pgIndex===totalPages-1){var sw=document.createElement("div");sw.className="a4-signature-wrap";var st=document.createElement("div");st.className="a4-signature-text";st.innerHTML=signatureLinesHtml(signatureLines);sw.appendChild(st);body.appendChild(sw);}' +
+          'sheet.appendChild(body);' +
           'if(totalPages>1){var pn=document.createElement("div");pn.className="a4-page-number";pn.textContent="Pagina "+(pgIndex+1)+" di "+totalPages;sheet.appendChild(pn);}' +
           'var fi=document.createElement("img");fi.className="a4-footer";fi.src=footerSrc;fi.alt="";sheet.appendChild(fi);' +
           'container.appendChild(sheet);' +
         '});' +
         'return pages.length;' +
       '}' +
-      'buildA4Sheets(document.getElementById("pages"), D.headerSrc, D.footerSrc, D.paziente, D.dataVal, D.note, D.items);' +
+      'buildA4Sheets(document.getElementById("pages"), D.headerSrc, D.footerSrc, D.paziente, D.dataVal, D.note, D.items, D.signatureLines);' +
       '<\/script>' +
       '</body></html>';
   }
@@ -3288,7 +3514,8 @@
       dataVal: fData.value || new Date().toLocaleDateString("it-IT"),
       note: fNote.value || "",
       ids: Array.from(state.selected),
-      templateId: fTemplate.value || "__default__"
+      templateId: fTemplate.value || "__default__",
+      signatureId: fSignature.value || "__none__"
     };
   }
 
@@ -3305,7 +3532,7 @@
     var list = loadLibrary();
     list.unshift({
       id: uid(), nome: nome, paziente: cur.paziente, dataVal: cur.dataVal,
-      note: cur.note, ids: cur.ids, templateId: cur.templateId, createdAt: Date.now()
+      note: cur.note, ids: cur.ids, templateId: cur.templateId, signatureId: cur.signatureId, createdAt: Date.now()
     });
     saveLibrary(list);
     var statusEl = document.getElementById("saveStatus");
@@ -3358,6 +3585,8 @@
         saveField("raccolta_esercizi_note", fNote.value);
         populateTemplateSelect(s.templateId || "__default__");
         saveField("raccolta_esercizi_template", fTemplate.value);
+        populateSignatureSelect(s.signatureId || "__none__");
+        saveField("raccolta_esercizi_signature", fSignature.value);
         state.selected = new Set(s.ids||[]);
         saveSelected(); updateSchedaCount(); renderDrawer(); renderGrid();
         closeLibrary();
@@ -3373,7 +3602,7 @@
       fileBtn.onclick = async function(){
         fileBtn.disabled = true;
         try{
-          var html = await buildStandaloneSchedaHTML({paziente:s.paziente, dataVal:s.dataVal, note:s.note, ids:s.ids, templateId:s.templateId});
+          var html = await buildStandaloneSchedaHTML({paziente:s.paziente, dataVal:s.dataVal, note:s.note, ids:s.ids, templateId:s.templateId, signatureId:s.signatureId});
           var filename = schedaFilename(s.paziente);
           downloadFallback(html, filename);
         }catch(e){
@@ -3521,12 +3750,14 @@
     saveField("raccolta_esercizi_note", fNote.value);
     populateTemplateSelect(s.templateId || "__default__");
     saveField("raccolta_esercizi_template", fTemplate.value);
+    populateSignatureSelect(s.signatureId || "__none__");
+    saveField("raccolta_esercizi_signature", fSignature.value);
     state.selected = new Set(s.ids);
     saveSelected(); updateSchedaCount(); renderDrawer(); renderGrid();
     var list = loadLibrary();
     list.unshift({
       id: uid(), nome: s.nome || "Scheda condivisa", paziente: s.paziente, dataVal: s.dataVal,
-      note: s.note, ids: s.ids, templateId: s.templateId, createdAt: Date.now()
+      note: s.note, ids: s.ids, templateId: s.templateId, signatureId: s.signatureId, createdAt: Date.now()
     });
     saveLibrary(list);
     document.getElementById("importBanner").classList.remove("open");
