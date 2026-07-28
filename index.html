@@ -508,6 +508,22 @@
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;
   }
 
+  /* ---------- MENU A TENDINA "TOOL" (Modelli/Firme/Cronologia) ---------- */
+  .tools-menu-wrap{position:relative;}
+  .tools-menu-wrap .btn{display:flex; align-items:center; gap:4px;}
+  .tools-menu{
+    position:absolute; right:0; top:100%; margin-top:4px; z-index:60;
+    background:#fff; border:1px solid var(--border); border-radius:9px;
+    box-shadow:0 8px 22px rgba(0,0,0,.16); min-width:160px; overflow:hidden;
+    display:none;
+  }
+  .tools-menu.open{display:block;}
+  .tools-menu button{
+    display:block; width:100%; text-align:left;
+    padding:10px 14px; font-size:13.5px; border:none; background:transparent; cursor:pointer; color:var(--text);
+  }
+  .tools-menu button:hover{background:var(--bg);}
+
 
   .gate-overlay{
     position:fixed; inset:0; background:var(--bg);
@@ -751,12 +767,20 @@
   <span class="offline-badge online" id="connBadge" title="Stato connessione">In linea</span>
   <button class="btn editor-only" id="addExerciseBtn">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-    Aggiungi esercizio
+    + esercizio
   </button>
   <button class="btn editor-only" id="editTreeBtn">Nuova cartella</button>
-  <button class="btn editor-only" id="manageTemplatesBtn">Modelli</button>
-  <button class="btn editor-only" id="manageSignaturesBtn">Firme</button>
-  <button class="btn editor-only" id="openLogBtn">Cronologia</button>
+  <div class="tools-menu-wrap editor-only">
+    <button class="btn" id="toolsMenuBtn">
+      Tool
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><polyline points="6 9 12 15 18 9"/></svg>
+    </button>
+    <div class="tools-menu" id="toolsMenu">
+      <button type="button" id="manageTemplatesBtn">Modelli</button>
+      <button type="button" id="manageSignaturesBtn">Firme</button>
+      <button type="button" id="openLogBtn">Cronologia</button>
+    </div>
+  </div>
   <button class="btn editor-only" id="bulkModeBtn">Seleziona</button>
   <div class="account-badge" id="accountBadge" style="display:none;">
     <span id="accountName"></span>
@@ -2644,6 +2668,21 @@
     if(openTreeMenuEl){ openTreeMenuEl.remove(); openTreeMenuEl = null; }
   }
   document.addEventListener("click", closeTreeActionMenu);
+
+  // ---------- MENU A TENDINA "TOOL" ----------
+  function closeToolsMenu(){
+    document.getElementById("toolsMenu").classList.remove("open");
+  }
+  document.getElementById("toolsMenuBtn").onclick = function(ev){
+    ev.stopPropagation();
+    document.getElementById("toolsMenu").classList.toggle("open");
+  };
+  document.getElementById("toolsMenu").addEventListener("click", function(ev){
+    ev.stopPropagation();
+    if(ev.target.tagName === "BUTTON") closeToolsMenu();
+  });
+  document.addEventListener("click", closeToolsMenu);
+
   function openTreeActionMenu(row, anchorBtn, label, area, path, isSubfolder){
     if(openTreeMenuEl){ closeTreeActionMenu(); return; }
     var menu = document.createElement("div");
