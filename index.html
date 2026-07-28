@@ -730,22 +730,19 @@
     margin: 0;
   }
   @media print{
-    /* Safari e Chrome hanno bisogno di due correzioni OPPOSTE per lo
-       stesso identico problema (verificato con test diretti): Safari
-       vuole gli altri elementi nascosti solo "alla vista"
-       (visibility:hidden), Chrome vuole che siano tolti anche dal
-       disegno della pagina (display:none) -- la classe sul <body>
-       (impostata automaticamente da JS in base al browser rilevato)
-       decide quale delle due si applica. */
+    /* Gli altri elementi della pagina (header, drawer, finestre di dialogo)
+       vengono rimossi DAVVERO dal DOM appena prima di stampare (vedi
+       printCurrentScheda in JS), non solo nascosti via CSS: e' l'unico modo
+       che si e' rivelato identico su Safari e Chrome -- i trucchi CSS
+       (visibility:hidden o display:none sugli altri elementi, con
+       #printPages reso visibile sopra di loro) si comportavano in modo
+       diverso e imprevedibile tra i due motori di stampa quando il
+       contenuto superava una pagina. Qui serve solo liberare l'altezza
+       del body (normalmente limitata a una schermata) e mostrare
+       #printPages, che a quel punto e' rimasto l'unico contenuto del body. */
     html, body{height:auto !important; overflow:visible !important;}
     body{display:block !important;}
-
-    body.print-mode-safari *{visibility:hidden;}
-    body.print-mode-safari #printPages, body.print-mode-safari #printPages *{visibility:visible;}
-    body.print-mode-safari #printPages{display:block !important; position:absolute; top:0; left:0; width:100%;}
-
-    body.print-mode-other > *{display:none !important;}
-    body.print-mode-other #printPages{display:block !important;}
+    #printPages{display:block !important;}
 
     #printPages .a4-sheet{
       box-shadow:none; margin:0; break-after:page; page-break-after:always;
@@ -1184,12 +1181,6 @@
 <script>
 (function(){
   "use strict";
-
-  // ---------- RILEVAMENTO BROWSER (per la stampa: Safari e Chrome hanno
-  // bisogno di correzioni CSS opposte per lo stesso problema) ----------
-  var ua = navigator.userAgent || "";
-  var isSafariBrowser = /^((?!chrome|android|crios|fxios|edg).)*safari/i.test(ua);
-  document.body.classList.add(isSafariBrowser ? "print-mode-safari" : "print-mode-other");
 
   // ---------- STATE ----------
   var state = {
@@ -3494,6 +3485,39 @@
     }).filter(function(sec){ return sec.items.length > 0 || sec.text; });
   }
 
+  // Rimuove DAVVERO dal DOM (non solo nasconde via CSS) tutti gli altri
+  // elementi del body durante la stampa, poi li ripristina subito dopo:
+  // e' l'unico modo che si e' rivelato identico tra Safari e Chrome quando
+  // la scheda supera una pagina -- i trucchi CSS (visibility:hidden o
+  // display:none con #printPages "in primo piano" sopra gli altri) si
+  // comportavano in modo diverso e imprevedibile tra i due motori di stampa.
+  function printOnlyElement(keepEl){
+    var removed = [];
+    Array.prototype.slice.call(document.body.children).forEach(function(child){
+      if(child !== keepEl){
+        removed.push({el: child, next: child.nextSibling});
+      }
+    });
+    removed.forEach(function(item){ document.body.removeChild(item.el); });
+
+    var restored = false;
+    function restoreAfterPrint(){
+      if(restored) return;
+      restored = true;
+      removed.forEach(function(item){ document.body.insertBefore(item.el, item.next); });
+      window.removeEventListener("afterprint", restoreAfterPrint);
+    }
+    window.addEventListener("afterprint", restoreAfterPrint);
+
+    window.print();
+    // Su desktop window.print() e' bloccante (l'esecuzione si ferma finche'
+    // il dialogo di stampa non si chiude): a quel punto si puo' ripristinare
+    // subito. Se per qualche motivo non fosse bloccante, ci pensa comunque
+    // l'evento "afterprint" qui sopra (la guardia "restored" evita di
+    // ripristinare due volte).
+    restoreAfterPrint();
+  }
+
   var originalDocTitle = document.title;
   function printCurrentScheda(){
     var tpl = templateById(fTemplate.value);
@@ -3504,8 +3528,8 @@
       fNote.value, currentItemsForPrint(), sig.lines
     );
     document.title = schedaFilename(fPaziente.value).replace(/\.html$/, "");
-    window.print();
-    setTimeout(function(){ document.title = originalDocTitle; }, 1000);
+    printOnlyElement(document.getElementById("printPages"));
+    document.title = originalDocTitle;
   }
 
   document.getElementById("printSchedaBtn").onclick = function(){
@@ -4125,7 +4149,7 @@
         scheda.paziente, scheda.dataVal || new Date().toLocaleDateString("it-IT"),
         scheda.note, itemsForIds(scheda.ids)
       );
-      window.print();
+      printOnlyElement(document.getElementById("printPages"));
     };
     return true;
   }
