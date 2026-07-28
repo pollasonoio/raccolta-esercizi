@@ -690,7 +690,7 @@
      cosi' la scheda e' SEMPRE in formato A4, sia a schermo che in stampa
      che nel file scaricato, indipendentemente da quanti esercizi contiene. */
   .a4-sheet{
-    width:21cm; height:29.7cm; box-sizing:border-box;
+    width:20.6cm; height:29.3cm; box-sizing:border-box;
     padding:1cm 2cm 1cm 2cm;
     margin:0 auto 24px; background:#fff;
     box-shadow:0 8px 30px rgba(0,0,0,.28);
@@ -3305,9 +3305,9 @@
   function buildA4Sheets(container, headerSrc, footerSrc, paziente, dataVal, note, sections, signatureLines){
     container.innerHTML = "";
 
-    var contentWCm = 21 - 2*2; // 17cm: larghezza foglio meno margini laterali (2cm ciascuno)
+    var contentWCm = 20.6 - 2*2; // larghezza foglio (ridotta di un margine di sicurezza) meno margini laterali (2cm ciascuno)
     var contentWPx = cmToPx(contentWCm);
-    var pageInnerHPx = cmToPx(29.7 - 2*1); // altezza utile: meno margini sopra/sotto (1cm ciascuno)
+    var pageInnerHPx = cmToPx(29.3 - 2*1); // altezza utile (foglio ridotto di sicurezza): meno margini sopra/sotto (1cm ciascuno)
     var headerHPx = headerSrc ? (cmToPx(contentWCm * LH_HEADER_RATIO) + cmToPx(0.5)) : 0;
     var footerHPx = footerSrc ? (cmToPx(contentWCm * LH_FOOTER_RATIO) + cmToPx(0.5)) : 0;
     // margine di sicurezza piu' ampio: evita che piccole differenze tra il
@@ -3648,7 +3648,7 @@
       '<style>' +
       'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;margin:0;background:#eef1ef;padding:24px;color:#1f2933;}' +
       '#pages{display:flex;flex-direction:column;align-items:center;}' +
-      '.a4-sheet{width:21cm;height:29.7cm;box-sizing:border-box;padding:1cm 2cm 1cm 2cm;margin:0 0 24px;background:#fff;box-shadow:0 8px 30px rgba(0,0,0,.28);display:flex;flex-direction:column;overflow:hidden;}' +
+      '.a4-sheet{width:20.6cm;height:29.3cm;box-sizing:border-box;padding:1cm 2cm 1cm 2cm;margin:0 0 24px;background:#fff;box-shadow:0 8px 30px rgba(0,0,0,.28);display:flex;flex-direction:column;overflow:hidden;}' +
       '.a4-sheet .a4-header{flex-shrink:0;width:100%;display:block;margin-bottom:0.5cm;}' +
       '.a4-sheet .a4-footer{flex-shrink:0;width:100%;display:block;margin-top:0.5cm;}' +
       '.a4-sheet .a4-body{flex:1 1 auto;overflow:hidden;}' +
@@ -3692,8 +3692,8 @@
       'function signatureLinesHtml(lines){return (lines||[]).filter(function(l){return l && l.text;}).map(function(l){var style=(l.bold?"font-weight:700;":"")+(l.italic?"font-style:italic;":"");return \'<div class="sig-line" style="\'+style+\'">\'+escapeHtml(l.text)+\'</div>\';}).join("");}' +
       'function buildA4Sheets(container,headerSrc,footerSrc,paziente,dataVal,note,sections,signatureLines){' +
         'container.innerHTML="";' +
-        'var contentWCm=21-2*2;var contentWPx=cmToPx(contentWCm);' +
-        'var pageInnerHPx=cmToPx(29.7-2*1);' +
+        'var contentWCm=20.6-2*2;var contentWPx=cmToPx(contentWCm);' +
+        'var pageInnerHPx=cmToPx(29.3-2*1);' +
         'var headerHPx=cmToPx(contentWCm*0.0959)+cmToPx(0.5);' +
         'var footerHPx=cmToPx(contentWCm*0.0690)+cmToPx(0.5);' +
         'var pageNumH=cmToPx(0.6);' +
