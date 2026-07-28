@@ -341,6 +341,10 @@
     padding:4px 6px; border-radius:6px;
   }
   .sched-section-head input.sec-title:focus{background:#fff; outline:1px solid var(--accent);}
+  .sched-section-head .sec-color{
+    width:22px; height:22px; padding:0; border:1px solid var(--border); border-radius:5px;
+    cursor:pointer; flex-shrink:0; background:none;
+  }
   .sched-section-head .sec-count{font-size:11px; color:var(--text-muted); flex-shrink:0;}
   .sched-section-head .sec-del{
     width:22px; height:22px; border-radius:999px; border:none; background:transparent; cursor:pointer;
@@ -644,7 +648,7 @@
   .print-item .pi-thumb img{width:100%; height:100%; object-fit:contain; display:block;}
   .print-item .pi-text{flex:1; min-width:0;}
   .print-item h4{margin:0 0 4px; font-size:14px;}
-  .print-item .pq{font-size:12px; font-weight:700; color:var(--accent-dark); margin-bottom:3px;}
+  .print-item .pq{font-size:12px; font-weight:700; color:#000; margin-bottom:3px;}
   .print-item p{margin:0; font-size:12px; color:#333; line-height:1.4;}
   .print-item .pnotes{margin-top:6px; font-size:11.5px; color:#888; border-top:1px dashed #ccc; padding-top:4px;}
   .a4-page-number{
@@ -952,10 +956,6 @@
       <button class="btn primary" id="saveToLibraryBtn">Salva nella libreria</button>
     </div>
     <div class="drawer-foot-row">
-      <button class="btn" id="shareLinkBtn" style="display:none;">Condividi link</button>
-      <button class="btn" id="saveSchedaBtn" style="flex:1;">Esporta file</button>
-    </div>
-    <div class="drawer-foot-row">
       <button class="btn danger" id="clearSchedaBtn">Svuota</button>
       <button class="btn primary" id="printSchedaBtn">Stampa / Esporta PDF</button>
     </div>
@@ -1213,7 +1213,7 @@
     state.selected = s;
   }
   function newSection(title){
-    return {id: "sec_" + Date.now().toString(36) + Math.random().toString(36).slice(2,5), title: title || "Nuova sezione", text: "", exerciseIds: []};
+    return {id: "sec_" + Date.now().toString(36) + Math.random().toString(36).slice(2,5), title: title || "Nuova sezione", text: "", color: "#7a5c00", exerciseIds: []};
   }
   // Alias di compatibilita': tutto il resto del codice richiama ancora
   // saveSelected() dopo aver modificato la scheda -- ora la vera fonte di
@@ -3093,6 +3093,14 @@
       titleInput.onclick = function(ev){ ev.stopPropagation(); };
       titleInput.oninput = function(){ sec.title = titleInput.value; saveSections(); };
       head.appendChild(titleInput);
+      var colorInput = document.createElement("input");
+      colorInput.type = "color";
+      colorInput.className = "sec-color";
+      colorInput.title = "Colore del titolo nella scheda stampata";
+      colorInput.value = sec.color || "#7a5c00";
+      colorInput.onclick = function(ev){ ev.stopPropagation(); };
+      colorInput.oninput = function(){ sec.color = colorInput.value; saveSections(); };
+      head.appendChild(colorInput);
       var cnt = document.createElement("span");
       cnt.className = "sec-count";
       cnt.textContent = (sec.exerciseIds||[]).length + " es.";
@@ -3234,10 +3242,11 @@
       '</div>';
   }
 
-  function buildSectionHeaderHtml(title, text){
+  function buildSectionHeaderHtml(title, text, color){
     if(!title && !text) return "";
+    var titleStyle = color ? (' style="color:'+color+'"') : "";
     return '<div class="print-section-head">' +
-      (title ? '<h3>'+escapeHtml(title)+'</h3>' : '') +
+      (title ? '<h3'+titleStyle+'>'+escapeHtml(title)+'</h3>' : '') +
       (text ? '<p class="section-text">'+escapeHtml(text).replace(/\n/g,'<br>')+'</p>' : '') +
       '</div>';
   }
@@ -3259,14 +3268,13 @@
     // calcolo a schermo e la resa in stampa creino una pagina aggiuntiva
     // quasi vuota per un trabocco di pochi millimetri
     var pageNumH = cmToPx(0.6);
-    // se e' stata scelta una firma, riservo uno spazio prudente su ogni
-    // pagina (piu' semplice e sicuro che calcolarlo solo per l'ultima,
-    // al costo di qualche riga in meno per foglio quando e' selezionata):
-    // e' testo, quindi bastano poche righe (~0.55cm l'una) invece dello
-    // spazio che serviva per un'immagine
     var hasSignature = signatureLines && signatureLines.length;
     var signatureHPx = hasSignature ? cmToPx(0.5 + signatureLines.length * 0.55) : 0;
-    var avail = pageInnerHPx - headerHPx - footerHPx - pageNumH - signatureHPx - cmToPx(0.9);
+    // avail "normale" (senza riservare spazio per la firma): usato per
+    // TUTTE le pagine in un primo passaggio, cosi' nessuna pagina spreca
+    // spazio per una firma che compare solo sull'ultima
+    var avail = pageInnerHPx - headerHPx - footerHPx - pageNumH - cmToPx(0.9);
+    var availWithSig = avail - signatureHPx;
 
     // "probe" invisibile per misurare l'altezza reale di ogni blocco (titolo
     // scheda, intestazione di sezione, singolo esercizio)
@@ -3288,7 +3296,7 @@
     // senza modifiche, sezioni comprese
     var blocks = [];
     (sections||[]).forEach(function(sec){
-      var headHtml = buildSectionHeaderHtml(sec.title, sec.text);
+      var headHtml = buildSectionHeaderHtml(sec.title, sec.text, sec.color);
       if(headHtml) blocks.push(headHtml);
       (sec.items||[]).forEach(function(it){
         blocks.push(buildItemHtml(it.imgSrc, it.nome, it.quantita, it.descrizione));
@@ -3301,6 +3309,7 @@
 
     document.body.removeChild(probe);
 
+    // Passaggio 1: impagina usando lo spazio "normale" per tutte le pagine
     var pages = [];
     var current = [];
     var isFirstPage = true;
@@ -3324,6 +3333,27 @@
     if(pages.length === 0){
       pages.push({items: [], isFirst: true});
     }
+
+    // Passaggio 2: se c'e' una firma, verifica che nell'ultima pagina ci
+    // sia davvero spazio anche per lei; se non basta, sposta gli ultimi
+    // blocchi in una nuova pagina finale (dove la firma trova posto)
+    if(hasSignature){
+      var lastPage = pages[pages.length - 1];
+      var lastUsed = (lastPage.isFirst ? titleH : 0) +
+        lastPage.items.reduce(function(sum, idx){ return sum + blockHeights[idx]; }, 0);
+      if(lastUsed > availWithSig && lastPage.items.length > 0){
+        var overflow = [];
+        while(lastPage.items.length > 0 && lastUsed > availWithSig){
+          var movedIdx = lastPage.items.pop();
+          lastUsed -= blockHeights[movedIdx];
+          overflow.unshift(movedIdx);
+        }
+        if(overflow.length){
+          pages.push({items: overflow, isFirst: false});
+        }
+      }
+    }
+
 
     var totalPages = pages.length;
     pages.forEach(function(pg, pgIndex){
@@ -3388,7 +3418,7 @@
         if(!e) return null;
         return { imgSrc: photosOf(id, e.img)[0] || "", nome: e.nome, quantita: e.quantita, descrizione: e.descrizione };
       }).filter(Boolean);
-      return { title: sec.title || "", text: sec.text || "", items: items };
+      return { title: sec.title || "", text: sec.text || "", color: sec.color || "", items: items };
     }).filter(function(sec){ return sec.items.length > 0 || sec.text; });
   }
 
@@ -3551,7 +3581,7 @@
     }
     var sections = (srcSections||[]).map(function(sec){
       var items = (sec.exerciseIds||[]).map(resolveItem).filter(Boolean);
-      return {title: sec.title||"", text: sec.text||"", items: items};
+      return {title: sec.title||"", text: sec.text||"", color: sec.color||"", items: items};
     }).filter(function(sec){ return sec.items.length > 0 || sec.text; });
 
     var title = "Scheda esercizi" + (paziente ? " - " + paziente : "") + " - " + dataVal;
@@ -3581,7 +3611,7 @@
       '.print-item .pi-thumb img{width:100%;height:100%;object-fit:contain;display:block;}' +
       '.print-item .pi-text{flex:1;min-width:0;}' +
       '.print-item h4{margin:0 0 4px;font-size:14px;}' +
-      '.print-item .pq{font-size:12px;font-weight:700;color:#7a5c00;margin-bottom:3px;}' +
+      '.print-item .pq{font-size:12px;font-weight:700;color:#000;margin-bottom:3px;}' +
       '.print-item p{margin:0;font-size:12px;color:#333;line-height:1.4;}' +
       '.print-item .pnotes{margin-top:6px;font-size:11.5px;color:#888;border-top:1px dashed #ccc;padding-top:4px;}' +
       '.a4-page-number{text-align:center;font-size:10.5px;color:#888;margin-top:0.3cm;flex-shrink:0;}' +
@@ -3604,7 +3634,7 @@
       'function cmToPx(cm){if(_cmPx===null){var p=document.createElement("div");p.style.cssText="position:absolute;visibility:hidden;height:0;width:100cm;";document.body.appendChild(p);_cmPx=p.getBoundingClientRect().width/100;document.body.removeChild(p);if(!_cmPx)_cmPx=37.7952755906;}return cm*_cmPx;}' +
       'function buildItemHtml(imgSrc,nome,quantita,descrizione){return \'<div class="print-item">\'+\'<div class="pi-thumb">\'+(imgSrc?\'<img src="\'+escapeHtml(imgSrc)+\'" alt="">\':"")+\'</div>\'+\'<div class="pi-text"><h4>\'+escapeHtml(nome)+\'</h4>\'+(quantita?\'<div class="pq">\'+escapeHtml(quantita)+\'</div>\':"")+\'<p>\'+escapeHtml(descrizione||"")+\'</p>\'+\'<div class="pnotes">Note: ______________________________________________</div>\'+\'</div></div>\';}' +
       'function buildTitleHtml(paziente,dataVal,note){return \'<div class="print-head"><h1>Scheda esercizi</h1><div class="print-meta">\'+(paziente?\'<span>Paziente: \'+escapeHtml(paziente)+\'</span>\':"")+\'<span>Data: \'+escapeHtml(dataVal)+\'</span></div>\'+(note?\'<div class="print-note">\'+escapeHtml(note)+\'</div>\':"")+\'</div>\';}' +
-      'function buildSectionHeaderHtml(title,text){if(!title && !text)return "";return \'<div class="print-section-head">\'+(title?\'<h3>\'+escapeHtml(title)+\'</h3>\':"")+(text?\'<p class="section-text">\'+escapeHtml(text).replace(/\\n/g,"<br>")+\'</p>\':"")+\'</div>\';}' +
+      'function buildSectionHeaderHtml(title,text,color){if(!title && !text)return "";var ts=color?(\' style="color:\'+color+\'"\'):"";return \'<div class="print-section-head">\'+(title?\'<h3\'+ts+\'>\'+escapeHtml(title)+\'</h3>\':"")+(text?\'<p class="section-text">\'+escapeHtml(text).replace(/\\n/g,"<br>")+\'</p>\':"")+\'</div>\';}' +
       'function signatureLinesHtml(lines){return (lines||[]).filter(function(l){return l && l.text;}).map(function(l){var style=(l.bold?"font-weight:700;":"")+(l.italic?"font-style:italic;":"");return \'<div class="sig-line" style="\'+style+\'">\'+escapeHtml(l.text)+\'</div>\';}).join("");}' +
       'function buildA4Sheets(container,headerSrc,footerSrc,paziente,dataVal,note,sections,signatureLines){' +
         'container.innerHTML="";' +
@@ -3615,14 +3645,15 @@
         'var pageNumH=cmToPx(0.6);' +
         'var hasSignature=signatureLines && signatureLines.length;' +
         'var signatureHPx=hasSignature?cmToPx(0.5+signatureLines.length*0.55):0;' +
-        'var avail=pageInnerHPx-headerHPx-footerHPx-pageNumH-signatureHPx-cmToPx(0.9);' +
+        'var avail=pageInnerHPx-headerHPx-footerHPx-pageNumH-cmToPx(0.9);' +
+        'var availWithSig=avail-signatureHPx;' +
         'var probe=document.createElement("div");' +
         'probe.style.cssText="position:absolute;left:-99999px;top:0;width:"+contentWPx+"px;visibility:hidden;";' +
         'document.body.appendChild(probe);' +
         'function measure(html){var d=document.createElement("div");d.innerHTML=html;probe.appendChild(d);var h=d.getBoundingClientRect().height;probe.removeChild(d);return h;}' +
         'var blocks=[];' +
         '(sections||[]).forEach(function(sec){' +
-          'var hh=buildSectionHeaderHtml(sec.title,sec.text);if(hh)blocks.push(hh);' +
+          'var hh=buildSectionHeaderHtml(sec.title,sec.text,sec.color);if(hh)blocks.push(hh);' +
           '(sec.items||[]).forEach(function(it){blocks.push(buildItemHtml(it.imgSrc,it.nome,it.quantita,it.descrizione));});' +
         '});' +
         'var titleHtml=buildTitleHtml(paziente,dataVal,note);var titleH=blocks.length?measure(titleHtml):0;' +
@@ -3634,6 +3665,17 @@
           'current.push(i);used+=h;}' +
         'if(current.length>0 || (isFirstPage && blocks.length===0)){pages.push({items:current,isFirst:isFirstPage});}' +
         'if(pages.length===0){pages.push({items:[],isFirst:true});}' +
+        'if(hasSignature){' +
+          'var lastPage=pages[pages.length-1];' +
+          'var lastUsed=(lastPage.isFirst?titleH:0)+lastPage.items.reduce(function(sum,idx){return sum+blockHeights[idx];},0);' +
+          'if(lastUsed>availWithSig && lastPage.items.length>0){' +
+            'var overflow=[];' +
+            'while(lastPage.items.length>0 && lastUsed>availWithSig){' +
+              'var movedIdx=lastPage.items.pop();lastUsed-=blockHeights[movedIdx];overflow.unshift(movedIdx);' +
+            '}' +
+            'if(overflow.length){pages.push({items:overflow,isFirst:false});}' +
+          '}' +
+        '}' +
         'var totalPages=pages.length;' +
         'pages.forEach(function(pg,pgIndex){' +
           'var sheet=document.createElement("div");sheet.className="a4-sheet";' +
@@ -3654,55 +3696,6 @@
   }
 
   var saveInProgress = false;
-  document.getElementById("saveSchedaBtn").onclick = async function(){
-    if(saveInProgress) return;
-    if(state.selected.size===0){
-      alert("La scheda e' vuota: aggiungi almeno un esercizio prima di salvare.");
-      return;
-    }
-    var statusEl = document.getElementById("saveStatus");
-    var btn = document.getElementById("saveSchedaBtn");
-    saveInProgress = true;
-    btn.disabled = true;
-    statusEl.textContent = "Preparazione del file...";
-    try{
-      var html = await buildStandaloneSchedaHTML();
-      var paziente = fPaziente.value || "";
-      var filename = schedaFilename(paziente);
-
-      if(window.showSaveFilePicker){
-        try{
-          var handle = await window.showSaveFilePicker({
-            suggestedName: filename,
-            types: [{description: "Pagina HTML", accept: {"text/html": [".html"]}}]
-          });
-          var writable = await handle.createWritable();
-          await writable.write(html);
-          await writable.close();
-          statusEl.textContent = "Scheda salvata: " + filename;
-          flashSaved("Scheda salvata.");
-        }catch(err){
-          if(err && err.name === "AbortError"){
-            statusEl.textContent = "";
-          } else {
-            downloadFallback(html, filename);
-            statusEl.textContent = "Scheda scaricata: " + filename;
-          }
-        }
-      } else {
-        downloadFallback(html, filename);
-        statusEl.textContent = "Scheda scaricata: " + filename;
-        alert('Il browser non permette di scegliere la cartella di salvataggio: la scheda "' + filename + '" e\' stata scaricata nella cartella Download del browser. Spostala dentro "Raccolta_Esercizi_Interattiva/Schede_Salvate" per tenerla insieme alle altre.');
-      }
-    }catch(e){
-      statusEl.textContent = "";
-      alert("Non sono riuscito a salvare la scheda: " + (e && e.message ? e.message : e));
-    }finally{
-      saveInProgress = false;
-      btn.disabled = false;
-      setTimeout(function(){ statusEl.textContent = ""; }, 5000);
-    }
-  };
 
   function downloadFallback(html, filename){
     var blob = new Blob([html], {type:"text/html"});
@@ -3926,17 +3919,10 @@
     document.getElementById("shareOverlay").classList.add("open");
     setTimeout(function(){ input.focus(); input.select(); }, 50);
   }
-  document.getElementById("shareLinkBtn").onclick = function(){
-    if(state.selected.size===0){
-      alert("La scheda e' vuota: aggiungi almeno un esercizio prima di condividerla.");
-      return;
-    }
-    openShareModal({
-      nome: fPaziente.value ? (fPaziente.value + " - " + (fData.value||"")) : "Scheda",
-      paziente: fPaziente.value, dataVal: fData.value, note: fNote.value,
-      ids: Array.from(state.selected), templateId: fTemplate.value || "__default__"
-    });
-  };
+  // Il pulsante "Condividi link" e' stato rimosso dall'interfaccia (la
+  // funzione restava comunque disattivata per un problema di
+  // funzionamento mai risolto); il resto della logica di condivisione
+  // sotto resta inutilizzato ma innocuo.
   document.getElementById("shareCloseBtn").onclick = function(){ document.getElementById("shareOverlay").classList.remove("open"); };
   document.getElementById("shareOverlay").addEventListener("click", function(ev){ if(ev.target===this) this.classList.remove("open"); });
   document.getElementById("shareCopyBtn").onclick = function(){
