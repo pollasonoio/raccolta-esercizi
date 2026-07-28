@@ -734,6 +734,14 @@
     #printPages, #printPages *{visibility:visible;}
     #printPages{
       display:block; position:absolute; top:0; left:0; width:100%;
+      /* TENTATIVO SPERIMENTALE: il contenuto risultava sistematicamente
+         rimpicciolito di circa 2/3 nella stampa/PDF reale (confermato con
+         misure precise su piu' PDF e browser), ma corretto quando l'utente
+         forzava manualmente lo zoom di stampa al 150% -- qui applichiamo
+         la stessa identica compensazione in automatico, SOLO in fase di
+         stampa (zoom si applica dopo che la nostra impaginazione, gia'
+         dimostrata corretta, e' stata calcolata a dimensioni normali). */
+      zoom: 1.5;
     }
     #printPages .a4-sheet{
       box-shadow:none; margin:0; break-after:page; page-break-after:always;
