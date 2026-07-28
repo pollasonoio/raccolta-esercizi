@@ -730,21 +730,23 @@
     margin: 0;
   }
   @media print{
-    /* CORREZIONE (tentativo precedente): il body ha "height:100vh;
-       overflow:hidden" per far stare l'interfaccia normale dell'app in
-       una sola schermata -- annullato per la stampa. Ha risolto il
-       problema su Safari ma non su Chrome: probabile causa residua e'
-       che gli altri elementi della pagina (header, drawer, le tante
-       finestre di dialogo, tutte "position:fixed") restavano comunque
-       PRESENTI nel calcolo del layout (visibility:hidden li nasconde alla
-       vista ma non li toglie dal conteggio dello spazio) -- alcuni motori
-       di stampa (Chrome, a quanto pare) ne risentono piu' di altri.
-       Ora li togliamo DAVVERO dal layout con display:none, non solo
-       dalla vista. */
+    /* Safari e Chrome hanno bisogno di due correzioni OPPOSTE per lo
+       stesso identico problema (verificato con test diretti): Safari
+       vuole gli altri elementi nascosti solo "alla vista"
+       (visibility:hidden), Chrome vuole che siano tolti anche dal
+       disegno della pagina (display:none) -- la classe sul <body>
+       (impostata automaticamente da JS in base al browser rilevato)
+       decide quale delle due si applica. */
     html, body{height:auto !important; overflow:visible !important;}
     body{display:block !important;}
-    body > *{display:none !important;}
-    #printPages{display:block !important;}
+
+    body.print-mode-safari > *{visibility:hidden;}
+    body.print-mode-safari #printPages, body.print-mode-safari #printPages *{visibility:visible;}
+    body.print-mode-safari #printPages{display:block !important; position:absolute; top:0; left:0; width:100%;}
+
+    body.print-mode-other > *{display:none !important;}
+    body.print-mode-other #printPages{display:block !important;}
+
     #printPages .a4-sheet{
       box-shadow:none; margin:0; break-after:page; page-break-after:always;
     }
@@ -1182,6 +1184,12 @@
 <script>
 (function(){
   "use strict";
+
+  // ---------- RILEVAMENTO BROWSER (per la stampa: Safari e Chrome hanno
+  // bisogno di correzioni CSS opposte per lo stesso problema) ----------
+  var ua = navigator.userAgent || "";
+  var isSafariBrowser = /^((?!chrome|android|crios|fxios|edg).)*safari/i.test(ua);
+  document.body.classList.add(isSafariBrowser ? "print-mode-safari" : "print-mode-other");
 
   // ---------- STATE ----------
   var state = {
