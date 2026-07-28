@@ -323,6 +323,13 @@
     color:var(--text-muted); display:flex; align-items:center; justify-content:center; flex-shrink:0;
   }
   .drawer-item .di-remove:hover{background:#fde8e6; color:#b42318;}
+  .drawer-item .di-move{
+    width:22px; height:22px; border-radius:6px; border:none; background:transparent; cursor:pointer;
+    color:var(--text-muted); display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .drawer-item .di-move:hover{background:var(--accent-light); color:var(--accent-dark);}
+  .drawer-item .di-move:disabled{opacity:.25; cursor:default;}
+  .drawer-item .di-move:disabled:hover{background:transparent; color:var(--text-muted);}
   .drawer-empty{color:var(--text-muted); font-size:13px; text-align:center; padding:30px 10px;}
 
   /* ---------- SEZIONI DELLA SCHEDA ---------- */
@@ -638,11 +645,11 @@
   .print-section-head h3{margin:0 0 4px; font-size:15px; color:var(--accent-dark);}
   .print-section-head .section-text{margin:0; font-size:11.5px; color:#555; line-height:1.4;}
   .print-item{
-    display:flex; gap:14px; padding:12px 0; border-bottom:1px solid #ddd;
+    display:flex; gap:14px; padding:8px 0; border-bottom:1px solid #ddd;
     break-inside:avoid;
   }
   .print-item .pi-thumb{
-    width:110px; height:110px; flex:0 0 110px; display:flex;
+    width:140px; height:140px; flex:0 0 140px; display:flex;
     align-items:center; justify-content:center; overflow:hidden; border-radius:6px;
   }
   .print-item .pi-thumb img{width:100%; height:100%; object-fit:contain; display:block;}
@@ -1244,6 +1251,11 @@
   // modifiche (eliminazioni, tag, cartelle, rinomine).
   var CUSTOM_EXERCISES = [];
   var customExercisesColRef = (typeof FIREBASE_ENABLED !== "undefined" && FIREBASE_ENABLED) ? firebase.firestore().collection("customExercises") : null;
+  // Libreria schede condivisa tra tutti gli editor (prima viveva solo nel
+  // localStorage del singolo browser/dispositivo, per questo non si vedeva
+  // passando a un altro PC pur con lo stesso account).
+  var SCHEDE_CACHE = [];
+  var schedeColRef = (typeof FIREBASE_ENABLED !== "undefined" && FIREBASE_ENABLED) ? firebase.firestore().collection("schede") : null;
   // Foto personalizzate per esercizio (fino a 3): sostituiscono o si
   // aggiungono alla foto originale che arriva dal Word. Vivono in una
   // collezione a parte (un documento per esercizio), per lo stesso motivo
@@ -2152,6 +2164,19 @@
         }
       }, function(err){
         console.error("Errore sincronizzazione foto personalizzate:", err);
+      });
+      schedeColRef.onSnapshot(function(snap){
+        var list = [];
+        snap.forEach(function(doc){
+          var d = doc.data();
+          d.id = doc.id;
+          list.push(d);
+        });
+        list.sort(function(a,b){ return (b.createdAt||0) - (a.createdAt||0); });
+        SCHEDE_CACHE = list;
+        if(document.getElementById("libraryOverlay").classList.contains("open")) renderLibrary();
+      }, function(err){
+        console.error("Errore sincronizzazione libreria schede:", err);
       });
     }
 
@@ -3136,7 +3161,7 @@
         secEmpty.textContent = "Nessun esercizio in questa sezione.";
         body.appendChild(secEmpty);
       } else {
-        sec.exerciseIds.forEach(function(id){
+        sec.exerciseIds.forEach(function(id, idx){
           var e = byId[id];
           if(!e) return;
           var row = document.createElement("div");
@@ -3147,6 +3172,28 @@
           var name = document.createElement("div");
           name.className = "di-name"; name.textContent = e.nome;
           row.appendChild(name);
+          var upBtn = document.createElement("button");
+          upBtn.className = "di-move"; upBtn.title = "Sposta su";
+          upBtn.disabled = idx === 0;
+          upBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>';
+          upBtn.onclick = function(){
+            if(idx === 0) return;
+            var arr = sec.exerciseIds;
+            var tmp = arr[idx-1]; arr[idx-1] = arr[idx]; arr[idx] = tmp;
+            saveSections(); renderDrawer();
+          };
+          row.appendChild(upBtn);
+          var downBtn = document.createElement("button");
+          downBtn.className = "di-move"; downBtn.title = "Sposta giu'";
+          downBtn.disabled = idx === sec.exerciseIds.length - 1;
+          downBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>';
+          downBtn.onclick = function(){
+            if(idx === sec.exerciseIds.length - 1) return;
+            var arr = sec.exerciseIds;
+            var tmp = arr[idx+1]; arr[idx+1] = arr[idx]; arr[idx] = tmp;
+            saveSections(); renderDrawer();
+          };
+          row.appendChild(downBtn);
           var rm = document.createElement("button");
           rm.className = "di-remove";
           rm.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
@@ -3213,14 +3260,13 @@
 
   var _cmPx = null;
   function cmToPx(cm){
-    if(_cmPx === null){
-      var probe = document.createElement("div");
-      probe.style.cssText = "position:absolute; visibility:hidden; height:0; width:100cm;";
-      document.body.appendChild(probe);
-      _cmPx = probe.getBoundingClientRect().width / 100;
-      document.body.removeChild(probe);
-      if(!_cmPx) _cmPx = 37.7952755906; // fallback teorico a 96dpi
-    }
+    // 1cm = 37.795275591px a 96dpi e' un valore FISSO, garantito dalla
+    // specifica CSS (definizione di "pixel di riferimento"), non qualcosa
+    // che va misurato dal vivo sulla pagina: farlo con una misurazione
+    // (come si faceva prima) rischiava di restituire un numero leggermente
+    // sbagliato a seconda dello stato della pagina in quel momento,
+    // sballando tutti i calcoli di impaginazione a cascata.
+    if(_cmPx === null) _cmPx = 37.7952755906;
     return cm * _cmPx;
   }
 
@@ -3606,8 +3652,8 @@
       '.print-section-head:first-child{margin-top:0;padding-top:0;border-top:none;}' +
       '.print-section-head h3{margin:0 0 4px;font-size:15px;color:#7a5c00;}' +
       '.print-section-head .section-text{margin:0;font-size:11.5px;color:#555;line-height:1.4;}' +
-      '.print-item{display:flex;gap:14px;padding:12px 0;border-bottom:1px solid #ddd;break-inside:avoid;}' +
-      '.print-item .pi-thumb{width:110px;height:110px;flex:0 0 110px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:6px;}' +
+      '.print-item{display:flex;gap:14px;padding:8px 0;border-bottom:1px solid #ddd;break-inside:avoid;}' +
+      '.print-item .pi-thumb{width:140px;height:140px;flex:0 0 140px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:6px;}' +
       '.print-item .pi-thumb img{width:100%;height:100%;object-fit:contain;display:block;}' +
       '.print-item .pi-text{flex:1;min-width:0;}' +
       '.print-item h4{margin:0 0 4px;font-size:14px;}' +
@@ -3631,7 +3677,7 @@
       'var D = ' + dataJson + ';' +
       'function escapeHtml(s){s=(s==null?"":String(s));var d=document.createElement("div");d.textContent=s;return d.innerHTML;}' +
       'var _cmPx=null;' +
-      'function cmToPx(cm){if(_cmPx===null){var p=document.createElement("div");p.style.cssText="position:absolute;visibility:hidden;height:0;width:100cm;";document.body.appendChild(p);_cmPx=p.getBoundingClientRect().width/100;document.body.removeChild(p);if(!_cmPx)_cmPx=37.7952755906;}return cm*_cmPx;}' +
+      'function cmToPx(cm){if(_cmPx===null){_cmPx=37.7952755906;}return cm*_cmPx;}' +
       'function buildItemHtml(imgSrc,nome,quantita,descrizione){return \'<div class="print-item">\'+\'<div class="pi-thumb">\'+(imgSrc?\'<img src="\'+escapeHtml(imgSrc)+\'" alt="">\':"")+\'</div>\'+\'<div class="pi-text"><h4>\'+escapeHtml(nome)+\'</h4>\'+(quantita?\'<div class="pq">\'+escapeHtml(quantita)+\'</div>\':"")+\'<p>\'+escapeHtml(descrizione||"")+\'</p>\'+\'<div class="pnotes">Note: ______________________________________________</div>\'+\'</div></div>\';}' +
       'function buildTitleHtml(paziente,dataVal,note){return \'<div class="print-head"><h1>Scheda esercizi</h1><div class="print-meta">\'+(paziente?\'<span>Paziente: \'+escapeHtml(paziente)+\'</span>\':"")+\'<span>Data: \'+escapeHtml(dataVal)+\'</span></div>\'+(note?\'<div class="print-note">\'+escapeHtml(note)+\'</div>\':"")+\'</div>\';}' +
       'function buildSectionHeaderHtml(title,text,color){if(!title && !text)return "";var ts=color?(\' style="color:\'+color+\'"\'):"";return \'<div class="print-section-head">\'+(title?\'<h3\'+ts+\'>\'+escapeHtml(title)+\'</h3>\':"")+(text?\'<p class="section-text">\'+escapeHtml(text).replace(/\\n/g,"<br>")+\'</p>\':"")+\'</div>\';}' +
@@ -3724,14 +3770,7 @@
   // ---------- LIBRERIA SCHEDE (salvataggio multiplo, riutilizzabile offline) ----------
   var LIB_KEY = "raccolta_esercizi_libreria_schede";
   function loadLibrary(){
-    try{
-      var raw = localStorage.getItem(LIB_KEY);
-      if(raw) return JSON.parse(raw);
-    }catch(e){}
-    return [];
-  }
-  function saveLibrary(list){
-    try{ localStorage.setItem(LIB_KEY, JSON.stringify(list)); }catch(e){}
+    return SCHEDE_CACHE;
   }
   function uid(){ return "s" + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 
@@ -3757,15 +3796,22 @@
     var nome = prompt("Nome della scheda:", suggestion);
     if(nome===null) return;
     nome = nome.trim() || suggestion;
-    var list = loadLibrary();
-    list.unshift({
-      id: uid(), nome: nome, paziente: cur.paziente, dataVal: cur.dataVal,
-      note: cur.note, ids: cur.ids, sections: cur.sections, templateId: cur.templateId, signatureId: cur.signatureId, createdAt: Date.now()
-    });
-    saveLibrary(list);
     var statusEl = document.getElementById("saveStatus");
-    statusEl.textContent = "Scheda salvata nella libreria.";
-    setTimeout(function(){ statusEl.textContent=""; }, 3000);
+    statusEl.textContent = "Salvataggio in corso...";
+    schedeColRef.doc(uid()).set({
+      nome: nome, paziente: cur.paziente, dataVal: cur.dataVal,
+      note: cur.note, ids: cur.ids, sections: cur.sections, templateId: cur.templateId, signatureId: cur.signatureId,
+      createdAt: Date.now(),
+      createdByName: currentEditorName || currentUserEmail || "sconosciuto",
+      createdByEmail: currentUserEmail || ""
+    }).then(function(){
+      logAction("Scheda salvata in libreria", nome);
+      statusEl.textContent = "Scheda salvata nella libreria.";
+      setTimeout(function(){ statusEl.textContent=""; }, 3000);
+    }).catch(function(err){
+      statusEl.textContent = "";
+      alert("Non sono riuscito a salvare la scheda: " + err.message);
+    });
   };
 
   function renderLibrary(){
@@ -3797,6 +3843,7 @@
       if(s.paziente) metaParts.push(s.paziente);
       if(s.dataVal) metaParts.push(s.dataVal);
       metaParts.push(n + (n===1 ? " esercizio" : " esercizi"));
+      if(s.createdByName) metaParts.push("creata da " + s.createdByName);
       meta.textContent = metaParts.join(" · ");
       info.appendChild(meta);
       card.appendChild(info);
@@ -3858,10 +3905,12 @@
       var delBtn = document.createElement("button");
       delBtn.className = "btn danger"; delBtn.textContent = "Elimina";
       delBtn.onclick = function(){
-        if(!confirm('Eliminare definitivamente la scheda "' + s.nome + '"?')) return;
-        var list2 = loadLibrary().filter(function(x){ return x.id !== s.id; });
-        saveLibrary(list2);
-        renderLibrary();
+        if(!confirm('Eliminare definitivamente la scheda "' + s.nome + '"? Sara\' rimossa per tutti gli editor.')) return;
+        schedeColRef.doc(s.id).delete().then(function(){
+          logAction("Eliminata scheda da libreria", s.nome);
+        }).catch(function(err){
+          alert("Non sono riuscito a eliminare la scheda: " + err.message);
+        });
       };
       actions.appendChild(delBtn);
 
