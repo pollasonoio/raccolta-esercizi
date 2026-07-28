@@ -3355,6 +3355,12 @@
 
     document.body.removeChild(probe);
 
+    console.log("[DIAGNOSTICA SCHEDA] sezioni ricevute:", (sections||[]).length,
+      "| blocchi totali generati:", blocks.length,
+      "| avail (px):", Math.round(avail), "| availWithSig (px):", Math.round(availWithSig),
+      "| titleH (px):", Math.round(titleH),
+      "| altezze blocchi (px):", blockHeights.map(function(h){ return Math.round(h); }));
+
     // Passaggio 1: impagina usando lo spazio "normale" per tutte le pagine
     var pages = [];
     var current = [];
@@ -3402,6 +3408,8 @@
 
 
     var totalPages = pages.length;
+    console.log("[DIAGNOSTICA SCHEDA] pagine risultanti:", totalPages,
+      "| blocchi per pagina:", pages.map(function(p){ return p.items.length; }));
     pages.forEach(function(pg, pgIndex){
       var sheet = document.createElement("div");
       sheet.className = "a4-sheet";
