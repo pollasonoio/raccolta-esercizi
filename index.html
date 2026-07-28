@@ -730,21 +730,21 @@
     margin: 0;
   }
   @media print{
-    /* CORREZIONE: il body ha "height:100vh; overflow:hidden" per far stare
-       l'interfaccia normale dell'app in una sola schermata -- ma questo
-       vincolo, se resta attivo anche in stampa, costringe TUTTO il
-       contenuto (che invece deve estendersi su piu' pagine A4 impilate)
-       dentro l'altezza di una singola schermata, con effetti imprevedibili
-       sul motore di stampa (probabile causa sia del rimpicciolimento sia
-       delle pagine in eccesso osservati). Lo annulliamo esplicitamente
-       solo per la stampa. */
+    /* CORREZIONE (tentativo precedente): il body ha "height:100vh;
+       overflow:hidden" per far stare l'interfaccia normale dell'app in
+       una sola schermata -- annullato per la stampa. Ha risolto il
+       problema su Safari ma non su Chrome: probabile causa residua e'
+       che gli altri elementi della pagina (header, drawer, le tante
+       finestre di dialogo, tutte "position:fixed") restavano comunque
+       PRESENTI nel calcolo del layout (visibility:hidden li nasconde alla
+       vista ma non li toglie dal conteggio dello spazio) -- alcuni motori
+       di stampa (Chrome, a quanto pare) ne risentono piu' di altri.
+       Ora li togliamo DAVVERO dal layout con display:none, non solo
+       dalla vista. */
     html, body{height:auto !important; overflow:visible !important;}
     body{display:block !important;}
-    body *{visibility:hidden;}
-    #printPages, #printPages *{visibility:visible;}
-    #printPages{
-      display:block; position:absolute; top:0; left:0; width:100%;
-    }
+    body > *{display:none !important;}
+    #printPages{display:block !important;}
     #printPages .a4-sheet{
       box-shadow:none; margin:0; break-after:page; page-break-after:always;
     }
