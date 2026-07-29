@@ -733,15 +733,19 @@
     /* Il body ha "height:100vh; overflow:hidden" per far stare l'interfaccia
        normale dell'app in una sola schermata -- annullato qui per la
        stampa, dove il contenuto deve potersi estendere su piu' pagine A4.
-       Gli altri elementi vengono nascosti alla vista (non tolti dal
-       flusso) e #printPages viene reso visibile "sopra" di loro. */
+       Gli altri elementi vengono tolti DAVVERO dal DOM in JS (vedi
+       printCurrentScheda) prima di stampare, non solo nascosti con
+       visibility:hidden: quest'ultimo li lascia comunque nel flusso del
+       documento, e Safari calcola allora la larghezza di #printPages
+       (se position:absolute) in base alla finestra del browser invece che
+       al foglio A4, rimpicciolendo poi tutto per farlo entrare nella
+       pagina -- causa dello zoom-indietro osservato. Con gli altri
+       elementi davvero assenti, #printPages resta nel flusso normale
+       (niente position:absolute) e la sua larghezza si calcola
+       correttamente sul foglio A4 sia su Safari sia su Chrome. */
     html, body{height:auto !important; overflow:visible !important;}
     body{display:block !important;}
-    body *{visibility:hidden;}
-    #printPages, #printPages *{visibility:visible;}
-    #printPages{
-      display:block !important; position:absolute; top:0; left:0; width:100%;
-    }
+    #printPages{display:block !important;}
 
     #printPages .a4-sheet{
       box-shadow:none; margin:0; break-after:page; page-break-after:always;
@@ -3494,8 +3498,43 @@
       fNote.value, currentItemsForPrint(), sig.lines
     );
     document.title = schedaFilename(fPaziente.value).replace(/\.html$/, "");
+
+    // Rimuove DAVVERO dal DOM (non solo "alla vista" con visibility:hidden)
+    // tutti gli altri elementi del body durante la stampa, e li ripristina
+    // subito dopo. Causa individuata: con visibility:hidden gli elementi
+    // restano comunque nel flusso del documento, quindi Safari continua a
+    // calcolare la larghezza di #printPages (position:absolute) in base
+    // alla finestra del browser a schermo intero invece che al foglio A4,
+    // per poi "rimpicciolire per adattare" il risultato alla pagina --
+    // esattamente lo zoom-indietro osservato. Rimuovendo gli altri elementi
+    // per davvero (e lasciando #printPages nel flusso normale, senza
+    // position:absolute) la larghezza viene calcolata correttamente sul
+    // foglio A4 sia da Safari sia da Chrome.
+    var printPagesEl = document.getElementById("printPages");
+    var removed = [];
+    Array.prototype.slice.call(document.body.children).forEach(function(child){
+      if(child !== printPagesEl){
+        removed.push({el: child, next: child.nextSibling});
+      }
+    });
+    removed.forEach(function(item){ document.body.removeChild(item.el); });
+
+    var restored = false;
+    function restoreAfterPrint(){
+      if(restored) return;
+      restored = true;
+      removed.forEach(function(item){ document.body.insertBefore(item.el, item.next); });
+      document.title = originalDocTitle;
+      window.removeEventListener("afterprint", restoreAfterPrint);
+    }
+    window.addEventListener("afterprint", restoreAfterPrint);
+
     window.print();
-    setTimeout(function(){ document.title = originalDocTitle; }, 1000);
+    // Su desktop window.print() e' bloccante (l'esecuzione si ferma finche'
+    // il dialogo di stampa non si chiude): a quel punto si puo' ripristinare
+    // subito. Se per qualche motivo non fosse bloccante, ci pensa comunque
+    // l'evento "afterprint" (la guardia "restored" evita il doppio ripristino).
+    restoreAfterPrint();
   }
 
   document.getElementById("printSchedaBtn").onclick = function(){
