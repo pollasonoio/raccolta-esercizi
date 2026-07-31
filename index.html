@@ -699,6 +699,17 @@
   .a4-sheet .a4-header{flex-shrink:0; width:100%; display:block; margin-bottom:0.5cm;}
   .a4-sheet .a4-footer{flex-shrink:0; width:100%; display:block; margin-top:0.5cm;}
   .a4-sheet .a4-body{flex:1 1 auto; overflow:hidden;}
+  /* ---------- LAYOUT A DUE COLONNE (stampa) ----------
+     Le due colonne sono due div affiancati con flex (non CSS column-count:
+     quest'ultimo, con l'impaginazione a piu' pagine, e' proprio il tipo di
+     proprieta' che Safari gestisce in modo incoerente rispetto a Chrome in
+     stampa). Essendo semplici flex-child a larghezza fissa dentro un
+     .a4-sheet gia' correttamente dimensionato sul foglio A4 (vedi il fix
+     del bug di stampa sopra), il calcolo della larghezza resta corretto e
+     identico su entrambi i browser. Il gap qui DEVE combaciare con
+     COL_GAP_CM nella funzione buildA4Sheets in JS (misurazione blocchi). */
+  .a4-columns{display:flex; gap:0.8cm; align-items:flex-start;}
+  .a4-col{flex:1 1 0; min-width:0;}
 
   /* ---------- ANTEPRIMA A SCHERMO ---------- */
   .preview-overlay{
@@ -3319,6 +3330,16 @@
 
     var contentWCm = 20.6 - 2*2; // larghezza foglio (ridotta di un margine di sicurezza) meno margini laterali (2cm ciascuno)
     var contentWPx = cmToPx(contentWCm);
+    // ---------- LAYOUT A DUE COLONNE ----------
+    // Sezioni ed esercizi vengono impaginati in due colonne affiancate per
+    // ridurre il numero di pagine. Le immagini restano alla dimensione
+    // originale (140x140px, vedi .pi-thumb in CSS): e' il testo a andare a
+    // capo su una colonna piu' stretta. Titolo scheda e firma restano
+    // invece a piena larghezza, sopra/sotto le due colonne (vedi CSS
+    // .a4-columns/.a4-col: il gap li' DEVE combaciare con COL_GAP_CM qui).
+    var COL_GAP_CM = 0.8;
+    var colWCm = (contentWCm - COL_GAP_CM) / 2;
+    var colWPx = cmToPx(colWCm);
     var pageInnerHPx = cmToPx(29.3 - 2*1); // altezza utile (foglio ridotto di sicurezza): meno margini sopra/sotto (1cm ciascuno)
     var headerHPx = headerSrc ? (cmToPx(contentWCm * LH_HEADER_RATIO) + cmToPx(0.5)) : 0;
     var footerHPx = footerSrc ? (cmToPx(contentWCm * LH_FOOTER_RATIO) + cmToPx(0.5)) : 0;
@@ -3335,11 +3356,14 @@
     var availWithSig = avail - signatureHPx;
 
     // "probe" invisibile per misurare l'altezza reale di ogni blocco (titolo
-    // scheda, intestazione di sezione, singolo esercizio)
+    // scheda, intestazione di sezione, singolo esercizio): il titolo si
+    // misura a piena larghezza, i blocchi delle sezioni/esercizi alla
+    // larghezza di UNA colonna (colWPx), perche' e' li' che finiranno
     var probe = document.createElement("div");
-    probe.style.cssText = "position:absolute; left:-99999px; top:0; width:"+contentWPx+"px; visibility:hidden;";
+    probe.style.cssText = "position:absolute; left:-99999px; top:0; visibility:hidden;";
     document.body.appendChild(probe);
-    function measure(html){
+    function measure(html, widthPx){
+      probe.style.width = widthPx + "px";
       var d = document.createElement("div");
       d.innerHTML = html;
       probe.appendChild(d);
@@ -3349,9 +3373,8 @@
     }
 
     // "appiattisce" le sezioni in una sequenza di blocchi (intestazione di
-    // sezione + i suoi esercizi, uno via l'altro), cosi' la stessa identica
-    // logica di impaginazione usata finora (un blocco alla volta) funziona
-    // senza modifiche, sezioni comprese
+    // sezione + i suoi esercizi, uno via l'altro): la stessa sequenza di
+    // sempre, solo che ora viene distribuita su due colonne invece che una
     var blocks = [];
     (sections||[]).forEach(function(sec){
       var headHtml = buildSectionHeaderHtml(sec.title, sec.text, sec.color);
@@ -3362,8 +3385,8 @@
     });
 
     var titleHtml = buildTitleHtml(paziente, dataVal, note);
-    var titleH = blocks.length ? measure(titleHtml) : 0;
-    var blockHeights = blocks.map(measure);
+    var titleH = blocks.length ? measure(titleHtml, contentWPx) : 0;
+    var blockHeights = blocks.map(function(html){ return measure(html, colWPx); });
 
     document.body.removeChild(probe);
 
@@ -3373,55 +3396,76 @@
       "| titleH (px):", Math.round(titleH),
       "| altezze blocchi (px):", blockHeights.map(function(h){ return Math.round(h); }));
 
-    // Passaggio 1: impagina usando lo spazio "normale" per tutte le pagine
-    var pages = [];
-    var current = [];
-    var isFirstPage = true;
-    var used = titleH;
-    for(var i=0;i<blocks.length;i++){
-      var h = blockHeights[i];
-      if(current.length > 0 && (used + h) > avail){
-        pages.push({items: current, isFirst: isFirstPage});
-        current = [];
-        isFirstPage = false;
-        used = 0;
+    // Impagina i blocchi in due colonne per pagina: ogni blocco va nella
+    // colonna al momento piu' "vuota" (bin-packing greedy); se ne' l'una
+    // ne' l'altra hanno piu' posto, si apre una pagina nuova. Una sezione
+    // che non entra intera in una colonna prosegue semplicemente nella
+    // colonna/pagina successiva, esattamente come un singolo esercizio.
+    // "isDocFirstPage" indica se la PRIMA pagina generata da questa
+    // chiamata puo' essere la primissima pagina della scheda (con titolo):
+    // e' true per l'impaginazione principale, false quando questa funzione
+    // viene richiamata per ricollocare un eventuale "trabocco" dovuto alla
+    // firma (vedi sotto), che non e' mai la primissima pagina.
+    function packRange(startIdx, isDocFirstPage, pageAvailFn){
+      var pgs = [];
+      var idx = startIdx;
+      var isFirstDocPage = isDocFirstPage;
+      while(idx < blocks.length || (pgs.length === 0 && blocks.length === 0 && isDocFirstPage)){
+        var pageAvail = pageAvailFn(isFirstDocPage);
+        var cols = [[], []], colUsed = [0, 0], order = [];
+        while(idx < blocks.length){
+          var h = blockHeights[idx];
+          var hasContent = cols[0].length > 0 || cols[1].length > 0;
+          var target = colUsed[0] <= colUsed[1] ? 0 : 1;
+          if(hasContent && (colUsed[target] + h) > pageAvail){
+            var other = 1 - target;
+            if((colUsed[other] + h) <= pageAvail){
+              target = other;
+            } else {
+              break; // nessuna delle due colonne ha piu' posto: pagina chiusa
+            }
+          }
+          cols[target].push(idx);
+          colUsed[target] += h;
+          order.push({col: target, idx: idx});
+          idx++;
+        }
+        pgs.push({cols: cols, colUsed: colUsed, order: order, isFirst: isFirstDocPage});
+        isFirstDocPage = false;
+        if(blocks.length === 0) break;
       }
-      current.push(i);
-      used += h;
-    }
-    // aggiunge l'ultima pagina solo se contiene davvero qualcosa (esercizi,
-    // o il titolo alla primissima pagina): evita fogli vuoti in coda
-    if(current.length > 0 || (isFirstPage && blocks.length === 0)){
-      pages.push({items: current, isFirst: isFirstPage});
-    }
-    if(pages.length === 0){
-      pages.push({items: [], isFirst: true});
+      return pgs;
     }
 
-    // Passaggio 2: se c'e' una firma, verifica che nell'ultima pagina ci
-    // sia davvero spazio anche per lei; se non basta, sposta gli ultimi
-    // blocchi in una nuova pagina finale (dove la firma trova posto)
+    var pages = packRange(0, true, function(isFirst){ return isFirst ? (avail - titleH) : avail; });
+
+    // Se c'e' una firma, verifica che nell'ultima pagina ci sia davvero
+    // spazio anche per lei sotto la colonna piu' alta delle due; se non
+    // basta, sposta gli ultimi blocchi assegnati (in ordine cronologico,
+    // indipendentemente da quale colonna) su una nuova pagina finale,
+    // ricompattandoli di nuovo in due colonne.
     if(hasSignature){
       var lastPage = pages[pages.length - 1];
-      var lastUsed = (lastPage.isFirst ? titleH : 0) +
-        lastPage.items.reduce(function(sum, idx){ return sum + blockHeights[idx]; }, 0);
-      if(lastUsed > availWithSig && lastPage.items.length > 0){
-        var overflow = [];
-        while(lastPage.items.length > 0 && lastUsed > availWithSig){
-          var movedIdx = lastPage.items.pop();
-          lastUsed -= blockHeights[movedIdx];
-          overflow.unshift(movedIdx);
+      var effAvailWithSig = lastPage.isFirst ? (availWithSig - titleH) : availWithSig;
+      var lastMax = Math.max(lastPage.colUsed[0], lastPage.colUsed[1]);
+      if(lastMax > effAvailWithSig && lastPage.order.length > 0){
+        var overflowIdxs = [];
+        while(lastPage.order.length > 0 && Math.max(lastPage.colUsed[0], lastPage.colUsed[1]) > effAvailWithSig){
+          var moved = lastPage.order.pop();
+          lastPage.colUsed[moved.col] -= blockHeights[moved.idx];
+          lastPage.cols[moved.col].pop();
+          overflowIdxs.unshift(moved.idx);
         }
-        if(overflow.length){
-          pages.push({items: overflow, isFirst: false});
+        if(overflowIdxs.length){
+          var overflowPages = packRange(overflowIdxs[0], false, function(){ return avail; });
+          pages = pages.concat(overflowPages);
         }
       }
     }
-
 
     var totalPages = pages.length;
     console.log("[DIAGNOSTICA SCHEDA] pagine risultanti:", totalPages,
-      "| blocchi per pagina:", pages.map(function(p){ return p.items.length; }));
+      "| blocchi per colonna per pagina:", pages.map(function(p){ return [p.cols[0].length, p.cols[1].length]; }));
     pages.forEach(function(pg, pgIndex){
       var sheet = document.createElement("div");
       sheet.className = "a4-sheet";
@@ -3438,7 +3482,13 @@
       body.className = "a4-body";
       var bodyHtml = "";
       if(pg.isFirst) bodyHtml += titleHtml;
-      pg.items.forEach(function(i){ bodyHtml += blocks[i]; });
+      bodyHtml += '<div class="a4-columns">';
+      [0, 1].forEach(function(c){
+        bodyHtml += '<div class="a4-col">';
+        pg.cols[c].forEach(function(i){ bodyHtml += blocks[i]; });
+        bodyHtml += '</div>';
+      });
+      bodyHtml += '</div>';
       body.innerHTML = bodyHtml;
       if(hasSignature && pgIndex === totalPages - 1){
         var sigWrap = document.createElement("div");
@@ -3699,6 +3749,8 @@
       '.a4-sheet .a4-header{flex-shrink:0;width:100%;display:block;margin-bottom:0.5cm;}' +
       '.a4-sheet .a4-footer{flex-shrink:0;width:100%;display:block;margin-top:0.5cm;}' +
       '.a4-sheet .a4-body{flex:1 1 auto;overflow:hidden;}' +
+      '.a4-columns{display:flex;gap:0.8cm;align-items:flex-start;}' +
+      '.a4-col{flex:1 1 0;min-width:0;}' +
       '.print-head{border-bottom:2px solid #F5C400;padding-bottom:10px;margin-bottom:16px;}' +
       '.print-head h1{font-size:19px;margin:0 0 6px;color:#7a5c00;}' +
       '.print-meta{font-size:13px;color:#333;display:flex;gap:22px;}' +
@@ -3740,6 +3792,7 @@
       'function buildA4Sheets(container,headerSrc,footerSrc,paziente,dataVal,note,sections,signatureLines){' +
         'container.innerHTML="";' +
         'var contentWCm=20.6-2*2;var contentWPx=cmToPx(contentWCm);' +
+        'var COL_GAP_CM=0.8;var colWCm=(contentWCm-COL_GAP_CM)/2;var colWPx=cmToPx(colWCm);' +
         'var pageInnerHPx=cmToPx(29.3-2*1);' +
         'var headerHPx=cmToPx(contentWCm*0.0959)+cmToPx(0.5);' +
         'var footerHPx=cmToPx(contentWCm*0.0690)+cmToPx(0.5);' +
@@ -3749,32 +3802,49 @@
         'var avail=pageInnerHPx-headerHPx-footerHPx-pageNumH-cmToPx(0.9);' +
         'var availWithSig=avail-signatureHPx;' +
         'var probe=document.createElement("div");' +
-        'probe.style.cssText="position:absolute;left:-99999px;top:0;width:"+contentWPx+"px;visibility:hidden;";' +
+        'probe.style.cssText="position:absolute;left:-99999px;top:0;visibility:hidden;";' +
         'document.body.appendChild(probe);' +
-        'function measure(html){var d=document.createElement("div");d.innerHTML=html;probe.appendChild(d);var h=d.getBoundingClientRect().height;probe.removeChild(d);return h;}' +
+        'function measure(html,widthPx){probe.style.width=widthPx+"px";var d=document.createElement("div");d.innerHTML=html;probe.appendChild(d);var h=d.getBoundingClientRect().height;probe.removeChild(d);return h;}' +
         'var blocks=[];' +
         '(sections||[]).forEach(function(sec){' +
           'var hh=buildSectionHeaderHtml(sec.title,sec.text,sec.color);if(hh)blocks.push(hh);' +
           '(sec.items||[]).forEach(function(it){blocks.push(buildItemHtml(it.imgSrc,it.nome,it.quantita,it.descrizione));});' +
         '});' +
-        'var titleHtml=buildTitleHtml(paziente,dataVal,note);var titleH=blocks.length?measure(titleHtml):0;' +
-        'var blockHeights=blocks.map(measure);' +
+        'var titleHtml=buildTitleHtml(paziente,dataVal,note);var titleH=blocks.length?measure(titleHtml,contentWPx):0;' +
+        'var blockHeights=blocks.map(function(html){return measure(html,colWPx);});' +
         'document.body.removeChild(probe);' +
-        'var pages=[];var current=[];var isFirstPage=true;var used=titleH;' +
-        'for(var i=0;i<blocks.length;i++){var h=blockHeights[i];' +
-          'if(current.length>0 && (used+h)>avail){pages.push({items:current,isFirst:isFirstPage});current=[];isFirstPage=false;used=0;}' +
-          'current.push(i);used+=h;}' +
-        'if(current.length>0 || (isFirstPage && blocks.length===0)){pages.push({items:current,isFirst:isFirstPage});}' +
-        'if(pages.length===0){pages.push({items:[],isFirst:true});}' +
+        'function packRange(startIdx,isDocFirstPage,pageAvailFn){' +
+          'var pgs=[];var idx=startIdx;var isFirstDocPage=isDocFirstPage;' +
+          'while(idx<blocks.length || (pgs.length===0 && blocks.length===0 && isDocFirstPage)){' +
+            'var pageAvail=pageAvailFn(isFirstDocPage);' +
+            'var cols=[[],[]],colUsed=[0,0],order=[];' +
+            'while(idx<blocks.length){' +
+              'var h=blockHeights[idx];' +
+              'var hasContent=cols[0].length>0 || cols[1].length>0;' +
+              'var target=colUsed[0]<=colUsed[1]?0:1;' +
+              'if(hasContent && (colUsed[target]+h)>pageAvail){' +
+                'var other=1-target;' +
+                'if((colUsed[other]+h)<=pageAvail){target=other;}else{break;}' +
+              '}' +
+              'cols[target].push(idx);colUsed[target]+=h;order.push({col:target,idx:idx});idx++;' +
+            '}' +
+            'pgs.push({cols:cols,colUsed:colUsed,order:order,isFirst:isFirstDocPage});' +
+            'isFirstDocPage=false;' +
+            'if(blocks.length===0)break;' +
+          '}' +
+          'return pgs;' +
+        '}' +
+        'var pages=packRange(0,true,function(isFirst){return isFirst?(avail-titleH):avail;});' +
         'if(hasSignature){' +
           'var lastPage=pages[pages.length-1];' +
-          'var lastUsed=(lastPage.isFirst?titleH:0)+lastPage.items.reduce(function(sum,idx){return sum+blockHeights[idx];},0);' +
-          'if(lastUsed>availWithSig && lastPage.items.length>0){' +
-            'var overflow=[];' +
-            'while(lastPage.items.length>0 && lastUsed>availWithSig){' +
-              'var movedIdx=lastPage.items.pop();lastUsed-=blockHeights[movedIdx];overflow.unshift(movedIdx);' +
+          'var effAvailWithSig=lastPage.isFirst?(availWithSig-titleH):availWithSig;' +
+          'var lastMax=Math.max(lastPage.colUsed[0],lastPage.colUsed[1]);' +
+          'if(lastMax>effAvailWithSig && lastPage.order.length>0){' +
+            'var overflowIdxs=[];' +
+            'while(lastPage.order.length>0 && Math.max(lastPage.colUsed[0],lastPage.colUsed[1])>effAvailWithSig){' +
+              'var moved=lastPage.order.pop();lastPage.colUsed[moved.col]-=blockHeights[moved.idx];lastPage.cols[moved.col].pop();overflowIdxs.unshift(moved.idx);' +
             '}' +
-            'if(overflow.length){pages.push({items:overflow,isFirst:false});}' +
+            'if(overflowIdxs.length){var overflowPages=packRange(overflowIdxs[0],false,function(){return avail;});pages=pages.concat(overflowPages);}' +
           '}' +
         '}' +
         'var totalPages=pages.length;' +
@@ -3782,7 +3852,11 @@
           'var sheet=document.createElement("div");sheet.className="a4-sheet";' +
           'var hi=document.createElement("img");hi.className="a4-header";hi.src=headerSrc;hi.alt="Centro di medicina";sheet.appendChild(hi);' +
           'var body=document.createElement("div");body.className="a4-body";' +
-          'var bodyHtml="";if(pg.isFirst)bodyHtml+=titleHtml;pg.items.forEach(function(i){bodyHtml+=blocks[i];});body.innerHTML=bodyHtml;' +
+          'var bodyHtml="";if(pg.isFirst)bodyHtml+=titleHtml;' +
+          'bodyHtml+=\'<div class="a4-columns">\';' +
+          '[0,1].forEach(function(c){bodyHtml+=\'<div class="a4-col">\';pg.cols[c].forEach(function(i){bodyHtml+=blocks[i];});bodyHtml+="</div>";});' +
+          'bodyHtml+="</div>";' +
+          'body.innerHTML=bodyHtml;' +
           'if(hasSignature && pgIndex===totalPages-1){var sw=document.createElement("div");sw.className="a4-signature-wrap";var st=document.createElement("div");st.className="a4-signature-text";st.innerHTML=signatureLinesHtml(signatureLines);sw.appendChild(st);body.appendChild(sw);}' +
           'sheet.appendChild(body);' +
           'if(totalPages>1){var pn=document.createElement("div");pn.className="a4-page-number";pn.textContent="Pagina "+(pgIndex+1)+" di "+totalPages;sheet.appendChild(pn);}' +
