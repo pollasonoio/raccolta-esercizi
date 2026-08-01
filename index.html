@@ -1214,7 +1214,7 @@
   let SHARED_MODE = /#s=/.test(location.hash || "");
   if(SHARED_MODE) document.body.classList.add("shared-mode");
 
-  let FIRESTORE_OVERRIDES = {deletedIds: [], folders: {}, moves: {}, treeRenames: {}, customFolders: [], tags: {}};
+  let FIRESTORE_OVERRIDES = {deletedIds: [], folders: {}, moves: {}, treeRenames: {}, customFolders: [], tags: {}, textOverrides: {}};
   // Gli esercizi aggiunti a mano (con le loro eventuali foto) vivono in una
   // collezione separata (un documento Firestore per esercizio, non piu' tutti
   // ammassati nell'unico documento overrides/catalog): cosi' le foto non
@@ -1246,53 +1246,88 @@
   CURRENT_EXERCISES.forEach(function(e){ byId[e.id] = e; });
 
   // ---------- MODIFICHE MANUALI (descrizione / quantita) ----------
-  // Le modifiche fatte dall'utente vengono salvate nel browser (localStorage)
-  // sopra ai dati originali, cosi' restano anche riaprendo il file. Il testo
-  // originale (arrivato dall'archivio schede pazienti) resta sempre recuperabile
-  // con "Ripristina originale".
+  // Le modifiche fatte dall'editor vengono salvate su Firestore, dentro
+  // overrides/catalog.textOverrides (lo stesso documento gia' usato per
+  // cartelle/tag/cancellazioni), cosi' sono visibili a chiunque acceda
+  // all'app con un account, non solo nel browser di chi le ha scritte, e
+  // restano agganciate all'esercizio giusto anche quando i Word vengono
+  // rielaborati (l'id e' ora stabile, vedi aggiorna_app.py). Il testo
+  // originale (quello dei Word) resta sempre recuperabile con
+  // "Ripristina originale".
   let ORIGINALS = {};
   BASE_EXERCISES.forEach(function(e){
     ORIGINALS[e.id] = {nome: e.nome, descrizione: e.descrizione, quantita: e.quantita};
   });
 
-  function loadOverrides(){
-    try{
-      var raw = localStorage.getItem("raccolta_esercizi_overrides");
-      if(raw) return JSON.parse(raw);
-    }catch(e){}
-    return {};
+  function applyTextOverrides(){
+    var overrides = FIRESTORE_OVERRIDES.textOverrides || {};
+    Object.keys(overrides).forEach(function(id){
+      if(byId[id]){
+        if(typeof overrides[id].nome === "string") byId[id].nome = overrides[id].nome;
+        if(typeof overrides[id].descrizione === "string") byId[id].descrizione = overrides[id].descrizione;
+        if(typeof overrides[id].quantita === "string") byId[id].quantita = overrides[id].quantita;
+      }
+    });
   }
-  function saveOverrides(overrides){
-    try{ localStorage.setItem("raccolta_esercizi_overrides", JSON.stringify(overrides)); }catch(e){}
-  }
-  let OVERRIDES = loadOverrides();
-  // applica subito le modifiche salvate ai dati in memoria
-  Object.keys(OVERRIDES).forEach(function(id){
-    if(byId[id]){
-      if(typeof OVERRIDES[id].nome === "string") byId[id].nome = OVERRIDES[id].nome;
-      if(typeof OVERRIDES[id].descrizione === "string") byId[id].descrizione = OVERRIDES[id].descrizione;
-      if(typeof OVERRIDES[id].quantita === "string") byId[id].quantita = OVERRIDES[id].quantita;
+
+  // Migrazione una tantum dal vecchio sistema (solo localStorage, prima del
+  // passaggio a Firestore): se questo browser aveva ancora modifiche salvate
+  // li' e non ancora presenti su Firestore, le carica su e le rimuove da
+  // qui, cosi' non vanno perse nel cambio. Viene chiamata a login avvenuto
+  // (serve essere autenticati per scrivere su Firestore).
+  function migrateLegacyTextOverrides(){
+    var raw = null;
+    try{ raw = localStorage.getItem("raccolta_esercizi_overrides"); }catch(e){}
+    if(!raw) return;
+    var legacy;
+    try{ legacy = JSON.parse(raw); }catch(e){ legacy = null; }
+    if(!legacy || !Object.keys(legacy).length){
+      try{ localStorage.removeItem("raccolta_esercizi_overrides"); }catch(e){}
+      return;
     }
-  });
+    var textMap = {};
+    for(var k in (FIRESTORE_OVERRIDES.textOverrides||{})) textMap[k] = FIRESTORE_OVERRIDES.textOverrides[k];
+    var changed = false;
+    Object.keys(legacy).forEach(function(id){
+      if(!textMap[id]){ textMap[id] = legacy[id]; changed = true; }
+    });
+    if(!changed){
+      try{ localStorage.removeItem("raccolta_esercizi_overrides"); }catch(e){}
+      return;
+    }
+    saveOverridesToFirestore({textOverrides: textMap}).then(function(){
+      try{ localStorage.removeItem("raccolta_esercizi_overrides"); }catch(e){}
+    }).catch(function(err){
+      console.error("Migrazione modifiche locali non riuscita, riprovo al prossimo accesso:", err);
+    });
+  }
 
   function setOverride(id, field, value){
-    if(!OVERRIDES[id]) OVERRIDES[id] = {};
-    OVERRIDES[id][field] = value;
+    var textMap = {};
+    for(var k in (FIRESTORE_OVERRIDES.textOverrides||{})) textMap[k] = FIRESTORE_OVERRIDES.textOverrides[k];
+    var entry = {}; for(var f in (textMap[id]||{})) entry[f] = textMap[id][f];
+    entry[field] = value;
+    textMap[id] = entry;
+    FIRESTORE_OVERRIDES.textOverrides = textMap;
     byId[id][field] = value;
-    saveOverrides(OVERRIDES);
+    return saveOverridesToFirestore({textOverrides: textMap});
   }
   function hasOverride(id){
-    return !!OVERRIDES[id] && (typeof OVERRIDES[id].nome === "string" || typeof OVERRIDES[id].descrizione === "string" || typeof OVERRIDES[id].quantita === "string");
+    var o = (FIRESTORE_OVERRIDES.textOverrides||{})[id];
+    return !!o && (typeof o.nome === "string" || typeof o.descrizione === "string" || typeof o.quantita === "string");
   }
   function resetOverride(id){
-    delete OVERRIDES[id];
-    saveOverrides(OVERRIDES);
+    var textMap = {};
+    for(var k in (FIRESTORE_OVERRIDES.textOverrides||{})) textMap[k] = FIRESTORE_OVERRIDES.textOverrides[k];
+    delete textMap[id];
+    FIRESTORE_OVERRIDES.textOverrides = textMap;
     var orig = ORIGINALS[id];
     if(orig){
       byId[id].nome = orig.nome;
       byId[id].descrizione = orig.descrizione;
       byId[id].quantita = orig.quantita;
     }
+    return saveOverridesToFirestore({textOverrides: textMap});
   }
 
   function normalize(s){
@@ -1796,10 +1831,14 @@
     btn.style.display = hasOverride(id) ? "inline-flex" : "none";
     btn.onclick = function(){
       if(!confirm("Ripristinare il testo originale per questo esercizio? Le modifiche fatte qui andranno perse.")) return;
-      resetOverride(id);
+      var savePromise = resetOverride(id);
       showModalAt(state.modalIndex);
       renderGrid();
-      flashSaved("Ripristinato il testo originale.");
+      savePromise.then(function(){
+        flashSaved("Ripristinato il testo originale.");
+      }).catch(function(err){
+        alert("Non sono riuscito a salvare il ripristino: " + err.message);
+      });
     };
   }
 
@@ -1818,10 +1857,14 @@
       var id = state.modalList[state.modalIndex];
       if(id===undefined) return;
       if(byId[id][field] === inputEl.value) return; // niente da salvare
-      setOverride(id, field, inputEl.value);
+      var savePromise = setOverride(id, field, inputEl.value);
       refreshResetBtn(id);
       renderGrid();
-      flashSaved();
+      savePromise.then(function(){
+        flashSaved();
+      }).catch(function(err){
+        alert("Non sono riuscito a salvare la modifica: " + err.message);
+      });
     }
     inputEl.addEventListener("input", function(){
       clearTimeout(editSaveTimer);
@@ -1992,13 +2035,7 @@
     CURRENT_EXERCISES = computeEffectiveList();
     byId = {};
     CURRENT_EXERCISES.forEach(function(e){ byId[e.id] = e; });
-    Object.keys(OVERRIDES).forEach(function(id){
-      if(byId[id]){
-        if(typeof OVERRIDES[id].nome === "string") byId[id].nome = OVERRIDES[id].nome;
-        if(typeof OVERRIDES[id].descrizione === "string") byId[id].descrizione = OVERRIDES[id].descrizione;
-        if(typeof OVERRIDES[id].quantita === "string") byId[id].quantita = OVERRIDES[id].quantita;
-      }
-    });
+    applyTextOverrides();
     TREE = buildTree();
     var selectionChanged = false;
     state.sections.forEach(function(sec){
@@ -2109,9 +2146,11 @@
           moves: data.moves || {},
           treeRenames: data.treeRenames || {},
           customFolders: data.customFolders || [],
-          tags: data.tags || {}
+          tags: data.tags || {},
+          textOverrides: data.textOverrides || {}
         };
         rebuildAll();
+        if(isEditor) migrateLegacyTextOverrides();
       }, function(err){
         console.error("Errore sincronizzazione catalogo condiviso:", err);
       });
