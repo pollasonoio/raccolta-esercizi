@@ -401,41 +401,12 @@
   .lib-card .lc-actions .btn{padding:6px 10px; font-size:12px;}
   .lib-card .lc-actions .btn svg{width:13px;height:13px;}
 
-  /* ---------- CONDIVIDI LINK ---------- */
-  .share-overlay{
-    position:fixed; inset:0; background:rgba(20,25,30,.55);
-    display:none; align-items:center; justify-content:center; z-index:120; padding:24px;
-  }
-  .share-overlay.open{display:flex;}
-  .share-modal{
-    background:#fff; border-radius:14px; max-width:520px; width:100%;
-    box-shadow:0 20px 60px rgba(0,0,0,.3); padding:22px 24px;
-  }
-  .share-modal h3{margin:0 0 6px; font-size:16px;}
-  .share-modal p{margin:0 0 14px; font-size:13px; color:var(--text-muted); line-height:1.5;}
-  .share-link-box{
-    display:flex; gap:8px; margin-bottom:14px;
-  }
-  .share-link-box input{
-    flex:1; padding:9px 10px; border:1px solid var(--border); border-radius:8px; font-size:12.5px;
-    background:var(--bg); color:var(--text); font-family:monospace;
-  }
-  .share-modal .modal-actions{display:flex; gap:10px; justify-content:flex-end;}
   .offline-badge{
     display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:700;
     padding:3px 9px; border-radius:999px; margin-left:2px;
   }
   .offline-badge.online{background:var(--accent-light); color:var(--accent-dark);}
   .offline-badge.offline{background:#fde8e6; color:#b42318;}
-  .import-banner{
-    position:fixed; top:0; left:0; right:0; background:var(--accent-dark); color:#fff;
-    padding:12px 18px; display:none; align-items:center; justify-content:space-between;
-    z-index:200; gap:14px; box-shadow:0 2px 10px rgba(0,0,0,.2);
-  }
-  .import-banner.open{display:flex;}
-  .import-banner .ib-text{font-size:13.5px; font-weight:600;}
-  .import-banner .ib-actions{display:flex; gap:8px; flex-shrink:0;}
-  .import-banner .btn{padding:7px 12px; font-size:12.5px;}
 
   /* ---------- MODALITA' EDITOR (catalogo condiviso via Firebase) ---------- */
   .editor-only{display:none;}
@@ -781,14 +752,6 @@
 <!-- FOGLI DI STAMPA: generati da JS (buildA4Sheets), visibili solo in stampa. -->
 <div id="printPages"></div>
 
-<div class="import-banner" id="importBanner">
-  <div class="ib-text" id="importBannerText"></div>
-  <div class="ib-actions">
-    <button class="btn" id="importBannerDismiss" style="background:transparent;border-color:rgba(255,255,255,.5);color:#fff;">Chiudi</button>
-    <button class="btn primary" id="importBannerAccept" style="background:#fff;color:var(--accent-dark);border-color:#fff;">Modifica questa scheda</button>
-  </div>
-</div>
-
 <!-- VISTA SCHEDA CONDIVISA -->
 <!-- Quando il link contiene #s=..., viene mostrata SOLO questa vista pulita
      (niente header, niente albero, niente login): esattamente la scheda,
@@ -1021,21 +984,6 @@
   </div>
 </div>
 
-<!-- CONDIVIDI LINK -->
-<div class="share-overlay" id="shareOverlay">
-  <div class="share-modal">
-    <h3>Condividi scheda via link</h3>
-    <p>Chi apre questo link, sullo stesso sito, vede la scheda con gli esercizi selezionati (nome, quantità, note). Se ha già aperto l'app in precedenza, funziona anche senza connessione.</p>
-    <div class="share-link-box">
-      <input type="text" id="shareLinkInput" readonly>
-      <button class="btn primary" id="shareCopyBtn">Copia</button>
-    </div>
-    <div class="modal-actions">
-      <button class="btn" id="shareCloseBtn">Chiudi</button>
-    </div>
-  </div>
-</div>
-
 <!-- GATE DI ACCESSO OBBLIGATORIO -->
 <div class="gate-overlay" id="gateOverlay">
   <div class="gate-box">
@@ -1197,7 +1145,7 @@
   "use strict";
 
   // ---------- STATE ----------
-  var state = {
+  let state = {
     area: null,      // area selezionata nell'albero (o null = tutte)
     path: [],         // percorso sottocartella selezionato
     query: "",
@@ -1263,38 +1211,38 @@
   // Rilevato il prima possibile: se il link contiene una scheda condivisa
   // (#s=...), l'app mostra SOLO quella scheda (niente gate, niente resto
   // dell'app) -- vedi initSharedView() piu' in basso.
-  var SHARED_MODE = /#s=/.test(location.hash || "");
+  let SHARED_MODE = /#s=/.test(location.hash || "");
   if(SHARED_MODE) document.body.classList.add("shared-mode");
 
-  var FIRESTORE_OVERRIDES = {deletedIds: [], folders: {}, moves: {}, treeRenames: {}, customFolders: [], tags: {}};
+  let FIRESTORE_OVERRIDES = {deletedIds: [], folders: {}, moves: {}, treeRenames: {}, customFolders: [], tags: {}};
   // Gli esercizi aggiunti a mano (con le loro eventuali foto) vivono in una
   // collezione separata (un documento Firestore per esercizio, non piu' tutti
   // ammassati nell'unico documento overrides/catalog): cosi' le foto non
   // rischiano di far superare il limite di 1MB condiviso da tutte le altre
   // modifiche (eliminazioni, tag, cartelle, rinomine).
-  var CUSTOM_EXERCISES = [];
-  var customExercisesColRef = (typeof FIREBASE_ENABLED !== "undefined" && FIREBASE_ENABLED) ? firebase.firestore().collection("customExercises") : null;
+  let CUSTOM_EXERCISES = [];
+  let customExercisesColRef = (typeof FIREBASE_ENABLED !== "undefined" && FIREBASE_ENABLED) ? firebase.firestore().collection("customExercises") : null;
   // Libreria schede condivisa tra tutti gli editor (prima viveva solo nel
   // localStorage del singolo browser/dispositivo, per questo non si vedeva
   // passando a un altro PC pur con lo stesso account).
-  var SCHEDE_CACHE = [];
-  var schedeColRef = (typeof FIREBASE_ENABLED !== "undefined" && FIREBASE_ENABLED) ? firebase.firestore().collection("schede") : null;
+  let SCHEDE_CACHE = [];
+  let schedeColRef = (typeof FIREBASE_ENABLED !== "undefined" && FIREBASE_ENABLED) ? firebase.firestore().collection("schede") : null;
   // Foto personalizzate per esercizio (fino a 3): sostituiscono o si
   // aggiungono alla foto originale che arriva dal Word. Vivono in una
   // collezione a parte (un documento per esercizio), per lo stesso motivo
   // per cui gli esercizi personalizzati sono stati spostati li': non far
   // mai rischiare di superare il limite di 1MB del cassetto principale.
-  var EXERCISE_PHOTOS = {};
-  var exercisePhotosColRef = (typeof FIREBASE_ENABLED !== "undefined" && FIREBASE_ENABLED) ? firebase.firestore().collection("exercisePhotos") : null;
+  let EXERCISE_PHOTOS = {};
+  let exercisePhotosColRef = (typeof FIREBASE_ENABLED !== "undefined" && FIREBASE_ENABLED) ? firebase.firestore().collection("exercisePhotos") : null;
   function photosOf(id, fallbackImg){
     var p = EXERCISE_PHOTOS[id];
     if(p && p.length) return p;
     return fallbackImg ? [fallbackImg] : [];
   }
 
-  var BASE_EXERCISES = EXERCISES;
-  var CURRENT_EXERCISES = BASE_EXERCISES;
-  var byId = {};
+  let BASE_EXERCISES = EXERCISES;
+  let CURRENT_EXERCISES = BASE_EXERCISES;
+  let byId = {};
   CURRENT_EXERCISES.forEach(function(e){ byId[e.id] = e; });
 
   // ---------- MODIFICHE MANUALI (descrizione / quantita) ----------
@@ -1302,7 +1250,7 @@
   // sopra ai dati originali, cosi' restano anche riaprendo il file. Il testo
   // originale (arrivato dall'archivio schede pazienti) resta sempre recuperabile
   // con "Ripristina originale".
-  var ORIGINALS = {};
+  let ORIGINALS = {};
   BASE_EXERCISES.forEach(function(e){
     ORIGINALS[e.id] = {nome: e.nome, descrizione: e.descrizione, quantita: e.quantita};
   });
@@ -1317,7 +1265,7 @@
   function saveOverrides(overrides){
     try{ localStorage.setItem("raccolta_esercizi_overrides", JSON.stringify(overrides)); }catch(e){}
   }
-  var OVERRIDES = loadOverrides();
+  let OVERRIDES = loadOverrides();
   // applica subito le modifiche salvate ai dati in memoria
   Object.keys(OVERRIDES).forEach(function(id){
     if(byId[id]){
@@ -1375,7 +1323,7 @@
     });
     return tree;
   }
-  var TREE = buildTree();
+  let TREE = buildTree();
 
   function isActiveNode(area, path){
     if(state.area !== area) return false;
@@ -1795,7 +1743,7 @@
     return exercisePhotosColRef.doc(String(id)).set({photos: photos});
   }
 
-  var photoActionMode = null; // "replace" oppure "add"
+  let photoActionMode = null; // "replace" oppure "add"
   document.getElementById("photoReplaceBtn").onclick = function(){
     photoActionMode = "replace";
     document.getElementById("photoFileInput").click();
@@ -1855,7 +1803,7 @@
     };
   }
 
-  var saveFlashTimer = null;
+  let saveFlashTimer = null;
   function flashSaved(msg){
     var el = document.getElementById("editStatus");
     el.textContent = msg || "Modifiche salvate.";
@@ -1863,7 +1811,7 @@
     saveFlashTimer = setTimeout(function(){ el.textContent = ""; }, 2200);
   }
 
-  var editSaveTimer = null;
+  let editSaveTimer = null;
   function wireEditableField(inputEl, field){
     function commit(){
       clearTimeout(editSaveTimer);
@@ -1886,7 +1834,7 @@
   wireEditableField(document.getElementById("modalDescrInput"), "descrizione");
 
   // ---------- TAG MANUALI (condivisi, solo editor puo' modificarli) ----------
-  var tagsSaveTimer = null;
+  let tagsSaveTimer = null;
   function saveTagsFor(id, value){
     var tagsMap = {}; for(var k in (FIRESTORE_OVERRIDES.tags||{})) tagsMap[k] = FIRESTORE_OVERRIDES.tags[k];
     var cleaned = value.trim();
@@ -1899,7 +1847,7 @@
       alert("Non sono riuscito a salvare i tag: " + err.message);
     });
   }
-  var modalTagsInputEl = document.getElementById("modalTagsInput");
+  let modalTagsInputEl = document.getElementById("modalTagsInput");
   modalTagsInputEl.addEventListener("input", function(){
     clearTimeout(tagsSaveTimer);
     var id = state.modalList[state.modalIndex];
@@ -1926,8 +1874,14 @@
   function closeModal(){
     document.getElementById("modalOverlay").classList.remove("open");
   }
+  // Sfugge s per essere inserito sia come testo HTML sia dentro un attributo
+  // tra virgolette doppie (es. src="..."): il vecchio trucco textContent->
+  // innerHTML lasciava passare le virgolette invariate, che dentro un
+  // attributo avrebbero potuto chiudere l'attributo stesso in anticipo.
   function escapeHtml(s){
-    var d = document.createElement("div"); d.textContent = s; return d.innerHTML;
+    s = (s == null ? "" : String(s));
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
 
   document.getElementById("modalClose").onclick = closeModal;
@@ -1954,8 +1908,8 @@
   // non e' ancora stato compilato, FIREBASE_ENABLED e' false e questa intera
   // sezione resta inattiva: l'app funziona come prima, solo senza editing condiviso.
   // ==========================================================================
-  var isEditor = false;
-  var overridesDocRef = (typeof FIREBASE_ENABLED !== "undefined" && FIREBASE_ENABLED) ? firebase.firestore().collection("overrides").doc("catalog") : null;
+  let isEditor = false;
+  let overridesDocRef = (typeof FIREBASE_ENABLED !== "undefined" && FIREBASE_ENABLED) ? firebase.firestore().collection("overrides").doc("catalog") : null;
 
   function computeEffectiveList(){
     var deleted = {};
@@ -2062,8 +2016,8 @@
   }
 
   // ---------- CRONOLOGIA MODIFICHE (firmata con nome di chi agisce) ----------
-  var currentEditorName = "";
-  var currentUserEmail = "";
+  let currentEditorName = "";
+  let currentUserEmail = "";
   function logAction(action, detail){
     if(!FIREBASE_ENABLED) return;
     try{
@@ -2356,8 +2310,8 @@
   };
 
   // ---------- TRASCINAMENTO ESERCIZIO SU CARTELLA (mouse e tocco) ----------
-  var dragState = null;
-  var DRAG_THRESHOLD = 10;
+  let dragState = null;
+  let DRAG_THRESHOLD = 10;
 
   function startCardDragTracking(card, exercise){
     card.addEventListener("pointerdown", function(ev){
@@ -2496,7 +2450,7 @@
   // modelli, caricati dalla modalita' editor, vengono salvati su Firebase
   // Storage (le immagini) + Firestore (l'elenco), cosi' sono visibili subito
   // a chiunque apra l'app.
-  var TEMPLATES_CACHE = [];
+  let TEMPLATES_CACHE = [];
 
   function builtinTemplates(){
     return [
@@ -2645,8 +2599,8 @@
   };
 
   // ---------- FIRME A FINE SCHEDA (testo formattato, fino a 3 righe) ----------
-  var SIGNATURES_CACHE = [];
-  var signaturesColRef = (typeof FIREBASE_ENABLED !== "undefined" && FIREBASE_ENABLED) ? firebase.firestore().collection("signatures") : null;
+  let SIGNATURES_CACHE = [];
+  let signaturesColRef = (typeof FIREBASE_ENABLED !== "undefined" && FIREBASE_ENABLED) ? firebase.firestore().collection("signatures") : null;
   function allSignatures(){
     return [{id: "__none__", nome: "Nessuna firma", lines: []}].concat(SIGNATURES_CACHE);
   }
@@ -2791,7 +2745,7 @@
   };
 
 
-  var toastTimer = null;
+  let toastTimer = null;
   function showToast(msg){
     var el = document.getElementById("globalToast");
     el.textContent = msg;
@@ -2801,7 +2755,7 @@
   }
 
   // ---------- MENU AZIONI CARTELLA (rinomina / sposta / elimina) ----------
-  var openTreeMenuEl = null;
+  let openTreeMenuEl = null;
   function closeTreeActionMenu(){
     if(openTreeMenuEl){ openTreeMenuEl.remove(); openTreeMenuEl = null; }
   }
@@ -3255,9 +3209,9 @@
   };
 
   // campi paziente/data/note persistenti
-  var fPaziente = document.getElementById("fPaziente");
-  var fData = document.getElementById("fData");
-  var fNote = document.getElementById("fNote");
+  let fPaziente = document.getElementById("fPaziente");
+  let fData = document.getElementById("fData");
+  let fNote = document.getElementById("fNote");
   fPaziente.value = loadField("raccolta_esercizi_paziente", "");
   fData.value = loadField("raccolta_esercizi_data", new Date().toLocaleDateString("it-IT"));
   fNote.value = loadField("raccolta_esercizi_note", "");
@@ -3265,11 +3219,11 @@
   fData.oninput = function(){ saveField("raccolta_esercizi_data", fData.value); };
   fNote.oninput = function(){ saveField("raccolta_esercizi_note", fNote.value); };
 
-  var fTemplate = document.getElementById("fTemplate");
+  let fTemplate = document.getElementById("fTemplate");
   populateTemplateSelect(loadField("raccolta_esercizi_template", "__default__"));
   fTemplate.onchange = function(){ saveField("raccolta_esercizi_template", fTemplate.value); };
 
-  var fSignature = document.getElementById("fSignature");
+  let fSignature = document.getElementById("fSignature");
   populateSignatureSelect(loadField("raccolta_esercizi_signature", "__none__"));
   fSignature.onchange = function(){ saveField("raccolta_esercizi_signature", fSignature.value); };
 
@@ -3278,10 +3232,10 @@
   // vengono dalle immagini PNG originali della carta intestata: servono per
   // calcolare quanto spazio occupano su un foglio, senza dover attendere il
   // caricamento asincrono dell'immagine per fare i calcoli.
-  var LH_HEADER_RATIO = 0.0959;
-  var LH_FOOTER_RATIO = 0.0690;
+  let LH_HEADER_RATIO = 0.0959;
+  let LH_FOOTER_RATIO = 0.0690;
 
-  var _cmPx = null;
+  let _cmPx = null;
   function cmToPx(cm){
     // 1cm = 37.795275591px a 96dpi e' un valore FISSO, garantito dalla
     // specifica CSS (definizione di "pixel di riferimento"), non qualcosa
@@ -3320,14 +3274,17 @@
       '</div>';
   }
 
-  // Suddivide intestazione + sezioni in uno o piu' fogli A4 (.a4-sheet) e li
-  // disegna dentro "container". Ogni foglio ha dimensione fissa 21x29.7cm:
-  // se il contenuto non entra in uno, se ne genera un altro identico, cosi'
-  // la scheda resta sempre in formato A4 a prescindere da quanto contiene.
-  // sections = [{title, text, items:[{imgSrc,nome,quantita,descrizione},...]}, ...]
-  function buildA4Sheets(container, headerSrc, footerSrc, paziente, dataVal, note, sections, signatureLines){
-    container.innerHTML = "";
+  // ---------- IMPAGINAZIONE A4 ----------
+  // buildA4Sheets e' stata divisa in queste fasi (geometria pagina -> blocchi
+  // HTML -> altezze misurate -> impaginazione in pagine/colonne -> disegno nel
+  // DOM) cosi' un futuro bug di impaginazione si isola guardando quale fase
+  // produce il numero sbagliato, senza dover rileggere ogni volta le ~200
+  // righe di logica tutte insieme.
 
+  // Calcola le dimensioni fisse del foglio A4 (in px) e lo spazio realmente
+  // disponibile per i blocchi in una colonna, al netto di intestazione,
+  // piede pagina, numero di pagina e (se presente) firma.
+  function computeA4Geometry(headerSrc, footerSrc, signatureLines){
     var contentWCm = 20.6 - 2*2; // larghezza foglio (ridotta di un margine di sicurezza) meno margini laterali (2cm ciascuno)
     var contentWPx = cmToPx(contentWCm);
     // ---------- LAYOUT A DUE COLONNE ----------
@@ -3354,11 +3311,29 @@
     // spazio per una firma che compare solo sull'ultima
     var avail = pageInnerHPx - headerHPx - footerHPx - pageNumH - cmToPx(0.9);
     var availWithSig = avail - signatureHPx;
+    return {contentWPx: contentWPx, colWPx: colWPx, avail: avail, availWithSig: availWithSig, hasSignature: hasSignature};
+  }
 
-    // "probe" invisibile per misurare l'altezza reale di ogni blocco (titolo
-    // scheda, intestazione di sezione, singolo esercizio): il titolo si
-    // misura a piena larghezza, i blocchi delle sezioni/esercizi alla
-    // larghezza di UNA colonna (colWPx), perche' e' li' che finiranno
+  // "Appiattisce" le sezioni in una sequenza di blocchi HTML (intestazione di
+  // sezione + i suoi esercizi, uno via l'altro): la stessa sequenza di
+  // sempre, distribuita poi su due colonne invece che una.
+  function flattenSectionsToBlocks(sections){
+    var blocks = [];
+    (sections||[]).forEach(function(sec){
+      var headHtml = buildSectionHeaderHtml(sec.title, sec.text, sec.color);
+      if(headHtml) blocks.push(headHtml);
+      (sec.items||[]).forEach(function(it){
+        blocks.push(buildItemHtml(it.imgSrc, it.nome, it.quantita, it.descrizione));
+      });
+    });
+    return blocks;
+  }
+
+  // "probe" invisibile per misurare l'altezza reale di ogni blocco (titolo
+  // scheda, intestazione di sezione, singolo esercizio): il titolo si misura
+  // a piena larghezza, i blocchi delle sezioni/esercizi alla larghezza di UNA
+  // colonna (colWPx), perche' e' li' che finiranno.
+  function measureBlocks(titleHtml, blocks, contentWPx, colWPx){
     var probe = document.createElement("div");
     probe.style.cssText = "position:absolute; left:-99999px; top:0; visibility:hidden;";
     document.body.appendChild(probe);
@@ -3371,101 +3346,86 @@
       probe.removeChild(d);
       return h;
     }
-
-    // "appiattisce" le sezioni in una sequenza di blocchi (intestazione di
-    // sezione + i suoi esercizi, uno via l'altro): la stessa sequenza di
-    // sempre, solo che ora viene distribuita su due colonne invece che una
-    var blocks = [];
-    (sections||[]).forEach(function(sec){
-      var headHtml = buildSectionHeaderHtml(sec.title, sec.text, sec.color);
-      if(headHtml) blocks.push(headHtml);
-      (sec.items||[]).forEach(function(it){
-        blocks.push(buildItemHtml(it.imgSrc, it.nome, it.quantita, it.descrizione));
-      });
-    });
-
-    var titleHtml = buildTitleHtml(paziente, dataVal, note);
     var titleH = blocks.length ? measure(titleHtml, contentWPx) : 0;
     var blockHeights = blocks.map(function(html){ return measure(html, colWPx); });
-
     document.body.removeChild(probe);
+    return {titleH: titleH, blockHeights: blockHeights};
+  }
 
-    console.log("[DIAGNOSTICA SCHEDA] sezioni ricevute:", (sections||[]).length,
-      "| blocchi totali generati:", blocks.length,
-      "| avail (px):", Math.round(avail), "| availWithSig (px):", Math.round(availWithSig),
-      "| titleH (px):", Math.round(titleH),
-      "| altezze blocchi (px):", blockHeights.map(function(h){ return Math.round(h); }));
-
-    // Impagina i blocchi in due colonne per pagina: ogni blocco va nella
-    // colonna al momento piu' "vuota" (bin-packing greedy); se ne' l'una
-    // ne' l'altra hanno piu' posto, si apre una pagina nuova. Una sezione
-    // che non entra intera in una colonna prosegue semplicemente nella
-    // colonna/pagina successiva, esattamente come un singolo esercizio.
-    // "isDocFirstPage" indica se la PRIMA pagina generata da questa
-    // chiamata puo' essere la primissima pagina della scheda (con titolo):
-    // e' true per l'impaginazione principale, false quando questa funzione
-    // viene richiamata per ricollocare un eventuale "trabocco" dovuto alla
-    // firma (vedi sotto), che non e' mai la primissima pagina.
-    function packRange(startIdx, isDocFirstPage, pageAvailFn){
-      var pgs = [];
-      var idx = startIdx;
-      var isFirstDocPage = isDocFirstPage;
-      while(idx < blocks.length || (pgs.length === 0 && blocks.length === 0 && isDocFirstPage)){
-        var pageAvail = pageAvailFn(isFirstDocPage);
-        var cols = [[], []], colUsed = [0, 0], order = [];
-        while(idx < blocks.length){
-          var h = blockHeights[idx];
-          var hasContent = cols[0].length > 0 || cols[1].length > 0;
-          var target = colUsed[0] <= colUsed[1] ? 0 : 1;
-          if(hasContent && (colUsed[target] + h) > pageAvail){
-            var other = 1 - target;
-            if((colUsed[other] + h) <= pageAvail){
-              target = other;
-            } else {
-              break; // nessuna delle due colonne ha piu' posto: pagina chiusa
-            }
+  // Impagina i blocchi [startIdx..] in due colonne per pagina: ogni blocco va
+  // nella colonna al momento piu' "vuota" (bin-packing greedy); se ne' l'una
+  // ne' l'altra hanno piu' posto, si apre una pagina nuova. Una sezione che
+  // non entra intera in una colonna prosegue semplicemente nella
+  // colonna/pagina successiva, esattamente come un singolo esercizio.
+  // "isDocFirstPage" indica se la PRIMA pagina generata da questa chiamata
+  // puo' essere la primissima pagina della scheda (con titolo): e' true per
+  // l'impaginazione principale, false quando la richiama
+  // packPagesWithSignature per ricollocare un eventuale "trabocco" dovuto
+  // alla firma, che non e' mai la primissima pagina.
+  function packRange(blockHeights, startIdx, isDocFirstPage, pageAvailFn){
+    var pgs = [];
+    var idx = startIdx;
+    var isFirstDocPage = isDocFirstPage;
+    while(idx < blockHeights.length || (pgs.length === 0 && blockHeights.length === 0 && isDocFirstPage)){
+      var pageAvail = pageAvailFn(isFirstDocPage);
+      var cols = [[], []], colUsed = [0, 0], order = [];
+      while(idx < blockHeights.length){
+        var h = blockHeights[idx];
+        var hasContent = cols[0].length > 0 || cols[1].length > 0;
+        var target = colUsed[0] <= colUsed[1] ? 0 : 1;
+        if(hasContent && (colUsed[target] + h) > pageAvail){
+          var other = 1 - target;
+          if((colUsed[other] + h) <= pageAvail){
+            target = other;
+          } else {
+            break; // nessuna delle due colonne ha piu' posto: pagina chiusa
           }
-          cols[target].push(idx);
-          colUsed[target] += h;
-          order.push({col: target, idx: idx});
-          idx++;
         }
-        pgs.push({cols: cols, colUsed: colUsed, order: order, isFirst: isFirstDocPage});
-        isFirstDocPage = false;
-        if(blocks.length === 0) break;
+        cols[target].push(idx);
+        colUsed[target] += h;
+        order.push({col: target, idx: idx});
+        idx++;
       }
-      return pgs;
+      pgs.push({cols: cols, colUsed: colUsed, order: order, isFirst: isFirstDocPage});
+      isFirstDocPage = false;
+      if(blockHeights.length === 0) break;
     }
+    return pgs;
+  }
 
-    var pages = packRange(0, true, function(isFirst){ return isFirst ? (avail - titleH) : avail; });
-
-    // Se c'e' una firma, verifica che nell'ultima pagina ci sia davvero
-    // spazio anche per lei sotto la colonna piu' alta delle due; se non
-    // basta, sposta gli ultimi blocchi assegnati (in ordine cronologico,
-    // indipendentemente da quale colonna) su una nuova pagina finale,
-    // ricompattandoli di nuovo in due colonne.
-    if(hasSignature){
-      var lastPage = pages[pages.length - 1];
-      var effAvailWithSig = lastPage.isFirst ? (availWithSig - titleH) : availWithSig;
-      var lastMax = Math.max(lastPage.colUsed[0], lastPage.colUsed[1]);
-      if(lastMax > effAvailWithSig && lastPage.order.length > 0){
-        var overflowIdxs = [];
-        while(lastPage.order.length > 0 && Math.max(lastPage.colUsed[0], lastPage.colUsed[1]) > effAvailWithSig){
-          var moved = lastPage.order.pop();
-          lastPage.colUsed[moved.col] -= blockHeights[moved.idx];
-          lastPage.cols[moved.col].pop();
-          overflowIdxs.unshift(moved.idx);
-        }
-        if(overflowIdxs.length){
-          var overflowPages = packRange(overflowIdxs[0], false, function(){ return avail; });
-          pages = pages.concat(overflowPages);
-        }
+  // Impagina tutti i blocchi e, se c'e' una firma, verifica che nell'ultima
+  // pagina ci sia davvero spazio anche per lei sotto la colonna piu' alta
+  // delle due; se non basta, sposta gli ultimi blocchi assegnati (in ordine
+  // cronologico, indipendentemente da quale colonna) su una nuova pagina
+  // finale, ricompattandoli di nuovo in due colonne.
+  function packPagesWithSignature(blockHeights, titleH, avail, availWithSig, hasSignature){
+    var pages = packRange(blockHeights, 0, true, function(isFirst){ return isFirst ? (avail - titleH) : avail; });
+    if(!hasSignature) return pages;
+    var lastPage = pages[pages.length - 1];
+    var effAvailWithSig = lastPage.isFirst ? (availWithSig - titleH) : availWithSig;
+    var lastMax = Math.max(lastPage.colUsed[0], lastPage.colUsed[1]);
+    if(lastMax > effAvailWithSig && lastPage.order.length > 0){
+      var overflowIdxs = [];
+      while(lastPage.order.length > 0 && Math.max(lastPage.colUsed[0], lastPage.colUsed[1]) > effAvailWithSig){
+        var moved = lastPage.order.pop();
+        lastPage.colUsed[moved.col] -= blockHeights[moved.idx];
+        lastPage.cols[moved.col].pop();
+        overflowIdxs.unshift(moved.idx);
+      }
+      if(overflowIdxs.length){
+        var overflowPages = packRange(blockHeights, overflowIdxs[0], false, function(){ return avail; });
+        pages = pages.concat(overflowPages);
       }
     }
+    return pages;
+  }
 
+  // Disegna in "container" un <div class="a4-sheet"> per ogni pagina calcolata
+  // da packPagesWithSignature: intestazione/piede pagina (se presenti), titolo
+  // scheda (solo sulla prima pagina), le due colonne di blocchi, il numero di
+  // pagina (se ce n'e' piu' di una) e la firma (solo sull'ultima).
+  function renderA4Pages(container, pages, blocks, titleHtml, headerSrc, footerSrc, hasSignature, signatureLines){
     var totalPages = pages.length;
-    console.log("[DIAGNOSTICA SCHEDA] pagine risultanti:", totalPages,
-      "| blocchi per colonna per pagina:", pages.map(function(p){ return [p.cols[0].length, p.cols[1].length]; }));
     pages.forEach(function(pg, pgIndex){
       var sheet = document.createElement("div");
       sheet.className = "a4-sheet";
@@ -3518,6 +3478,33 @@
 
       container.appendChild(sheet);
     });
+  }
+
+  // Suddivide intestazione + sezioni in uno o piu' fogli A4 (.a4-sheet) e li
+  // disegna dentro "container". Ogni foglio ha dimensione fissa 21x29.7cm:
+  // se il contenuto non entra in uno, se ne genera un altro identico, cosi'
+  // la scheda resta sempre in formato A4 a prescindere da quanto contiene.
+  // sections = [{title, text, items:[{imgSrc,nome,quantita,descrizione},...]}, ...]
+  function buildA4Sheets(container, headerSrc, footerSrc, paziente, dataVal, note, sections, signatureLines){
+    container.innerHTML = "";
+
+    var geo = computeA4Geometry(headerSrc, footerSrc, signatureLines);
+    var blocks = flattenSectionsToBlocks(sections);
+    var titleHtml = buildTitleHtml(paziente, dataVal, note);
+    var measured = measureBlocks(titleHtml, blocks, geo.contentWPx, geo.colWPx);
+
+    console.log("[DIAGNOSTICA SCHEDA] sezioni ricevute:", (sections||[]).length,
+      "| blocchi totali generati:", blocks.length,
+      "| avail (px):", Math.round(geo.avail), "| availWithSig (px):", Math.round(geo.availWithSig),
+      "| titleH (px):", Math.round(measured.titleH),
+      "| altezze blocchi (px):", measured.blockHeights.map(function(h){ return Math.round(h); }));
+
+    var pages = packPagesWithSignature(measured.blockHeights, measured.titleH, geo.avail, geo.availWithSig, geo.hasSignature);
+
+    console.log("[DIAGNOSTICA SCHEDA] pagine risultanti:", pages.length,
+      "| blocchi per colonna per pagina:", pages.map(function(p){ return [p.cols[0].length, p.cols[1].length]; }));
+
+    renderA4Pages(container, pages, blocks, titleHtml, headerSrc, footerSrc, geo.hasSignature, signatureLines);
 
     return pages.length;
   }
@@ -3538,7 +3525,7 @@
     }).filter(function(sec){ return sec.items.length > 0 || sec.text; });
   }
 
-  var originalDocTitle = document.title;
+  let originalDocTitle = document.title;
   function printCurrentScheda(){
     var tpl = templateById(fTemplate.value);
     var sig = signatureById(fSignature.value);
@@ -3659,7 +3646,7 @@
     try{ return typeof IMG_DATA !== "undefined" ? IMG_DATA : null; }catch(e){ return null; }
   }
 
-  var imgDataLoadPromise = null;
+  let imgDataLoadPromise = null;
   function ensureImgDataLoaded(){
     if(getImgData()) return Promise.resolve(true);
     if(imgDataLoadPromise) return imgDataLoadPromise;
@@ -3782,95 +3769,34 @@
       '<div id="pages"></div>' +
       '<script>' +
       'var D = ' + dataJson + ';' +
-      'function escapeHtml(s){s=(s==null?"":String(s));var d=document.createElement("div");d.textContent=s;return d.innerHTML;}' +
-      'var _cmPx=null;' +
-      'function cmToPx(cm){if(_cmPx===null){_cmPx=37.7952755906;}return cm*_cmPx;}' +
-      'function buildItemHtml(imgSrc,nome,quantita,descrizione){return \'<div class="print-item">\'+\'<div class="pi-thumb">\'+(imgSrc?\'<img src="\'+escapeHtml(imgSrc)+\'" alt="">\':"")+\'</div>\'+\'<div class="pi-text"><h4>\'+escapeHtml(nome)+\'</h4>\'+(quantita?\'<div class="pq">\'+escapeHtml(quantita)+\'</div>\':"")+\'<p>\'+escapeHtml(descrizione||"")+\'</p>\'+\'<div class="pnotes">Note: ______________________________________________</div>\'+\'</div></div>\';}' +
-      'function buildTitleHtml(paziente,dataVal,note){return \'<div class="print-head"><h1>Scheda esercizi</h1><div class="print-meta">\'+(paziente?\'<span>Paziente: \'+escapeHtml(paziente)+\'</span>\':"")+\'<span>Data: \'+escapeHtml(dataVal)+\'</span></div>\'+(note?\'<div class="print-note">\'+escapeHtml(note)+\'</div>\':"")+\'</div>\';}' +
-      'function buildSectionHeaderHtml(title,text,color){if(!title && !text)return "";var ts=color?(\' style="color:\'+color+\'"\'):"";return \'<div class="print-section-head">\'+(title?\'<h3\'+ts+\'>\'+escapeHtml(title)+\'</h3>\':"")+(text?\'<p class="section-text">\'+escapeHtml(text).replace(/\\n/g,"<br>")+\'</p>\':"")+\'</div>\';}' +
-      'function signatureLinesHtml(lines){return (lines||[]).filter(function(l){return l && l.text;}).map(function(l){var style=(l.bold?"font-weight:700;":"")+(l.italic?"font-style:italic;":"");return \'<div class="sig-line" style="\'+style+\'">\'+escapeHtml(l.text)+\'</div>\';}).join("");}' +
-      'function buildA4Sheets(container,headerSrc,footerSrc,paziente,dataVal,note,sections,signatureLines){' +
-        'container.innerHTML="";' +
-        'var contentWCm=20.6-2*2;var contentWPx=cmToPx(contentWCm);' +
-        'var COL_GAP_CM=0.8;var colWCm=(contentWCm-COL_GAP_CM)/2;var colWPx=cmToPx(colWCm);' +
-        'var pageInnerHPx=cmToPx(29.3-2*1);' +
-        'var headerHPx=cmToPx(contentWCm*0.0959)+cmToPx(0.5);' +
-        'var footerHPx=cmToPx(contentWCm*0.0690)+cmToPx(0.5);' +
-        'var pageNumH=cmToPx(0.6);' +
-        'var hasSignature=signatureLines && signatureLines.length;' +
-        'var signatureHPx=hasSignature?cmToPx(0.5+signatureLines.length*0.55):0;' +
-        'var avail=pageInnerHPx-headerHPx-footerHPx-pageNumH-cmToPx(0.9);' +
-        'var availWithSig=avail-signatureHPx;' +
-        'var probe=document.createElement("div");' +
-        'probe.style.cssText="position:absolute;left:-99999px;top:0;visibility:hidden;";' +
-        'document.body.appendChild(probe);' +
-        'function measure(html,widthPx){probe.style.width=widthPx+"px";var d=document.createElement("div");d.innerHTML=html;probe.appendChild(d);var h=d.getBoundingClientRect().height;probe.removeChild(d);return h;}' +
-        'var blocks=[];' +
-        '(sections||[]).forEach(function(sec){' +
-          'var hh=buildSectionHeaderHtml(sec.title,sec.text,sec.color);if(hh)blocks.push(hh);' +
-          '(sec.items||[]).forEach(function(it){blocks.push(buildItemHtml(it.imgSrc,it.nome,it.quantita,it.descrizione));});' +
-        '});' +
-        'var titleHtml=buildTitleHtml(paziente,dataVal,note);var titleH=blocks.length?measure(titleHtml,contentWPx):0;' +
-        'var blockHeights=blocks.map(function(html){return measure(html,colWPx);});' +
-        'document.body.removeChild(probe);' +
-        'function packRange(startIdx,isDocFirstPage,pageAvailFn){' +
-          'var pgs=[];var idx=startIdx;var isFirstDocPage=isDocFirstPage;' +
-          'while(idx<blocks.length || (pgs.length===0 && blocks.length===0 && isDocFirstPage)){' +
-            'var pageAvail=pageAvailFn(isFirstDocPage);' +
-            'var cols=[[],[]],colUsed=[0,0],order=[];' +
-            'while(idx<blocks.length){' +
-              'var h=blockHeights[idx];' +
-              'var hasContent=cols[0].length>0 || cols[1].length>0;' +
-              'var target=colUsed[0]<=colUsed[1]?0:1;' +
-              'if(hasContent && (colUsed[target]+h)>pageAvail){' +
-                'var other=1-target;' +
-                'if((colUsed[other]+h)<=pageAvail){target=other;}else{break;}' +
-              '}' +
-              'cols[target].push(idx);colUsed[target]+=h;order.push({col:target,idx:idx});idx++;' +
-            '}' +
-            'pgs.push({cols:cols,colUsed:colUsed,order:order,isFirst:isFirstDocPage});' +
-            'isFirstDocPage=false;' +
-            'if(blocks.length===0)break;' +
-          '}' +
-          'return pgs;' +
-        '}' +
-        'var pages=packRange(0,true,function(isFirst){return isFirst?(avail-titleH):avail;});' +
-        'if(hasSignature){' +
-          'var lastPage=pages[pages.length-1];' +
-          'var effAvailWithSig=lastPage.isFirst?(availWithSig-titleH):availWithSig;' +
-          'var lastMax=Math.max(lastPage.colUsed[0],lastPage.colUsed[1]);' +
-          'if(lastMax>effAvailWithSig && lastPage.order.length>0){' +
-            'var overflowIdxs=[];' +
-            'while(lastPage.order.length>0 && Math.max(lastPage.colUsed[0],lastPage.colUsed[1])>effAvailWithSig){' +
-              'var moved=lastPage.order.pop();lastPage.colUsed[moved.col]-=blockHeights[moved.idx];lastPage.cols[moved.col].pop();overflowIdxs.unshift(moved.idx);' +
-            '}' +
-            'if(overflowIdxs.length){var overflowPages=packRange(overflowIdxs[0],false,function(){return avail;});pages=pages.concat(overflowPages);}' +
-          '}' +
-        '}' +
-        'var totalPages=pages.length;' +
-        'pages.forEach(function(pg,pgIndex){' +
-          'var sheet=document.createElement("div");sheet.className="a4-sheet";' +
-          'var hi=document.createElement("img");hi.className="a4-header";hi.src=headerSrc;hi.alt="Centro di medicina";sheet.appendChild(hi);' +
-          'var body=document.createElement("div");body.className="a4-body";' +
-          'var bodyHtml="";if(pg.isFirst)bodyHtml+=titleHtml;' +
-          'bodyHtml+=\'<div class="a4-columns">\';' +
-          '[0,1].forEach(function(c){bodyHtml+=\'<div class="a4-col">\';pg.cols[c].forEach(function(i){bodyHtml+=blocks[i];});bodyHtml+="</div>";});' +
-          'bodyHtml+="</div>";' +
-          'body.innerHTML=bodyHtml;' +
-          'if(hasSignature && pgIndex===totalPages-1){var sw=document.createElement("div");sw.className="a4-signature-wrap";var st=document.createElement("div");st.className="a4-signature-text";st.innerHTML=signatureLinesHtml(signatureLines);sw.appendChild(st);body.appendChild(sw);}' +
-          'sheet.appendChild(body);' +
-          'if(totalPages>1){var pn=document.createElement("div");pn.className="a4-page-number";pn.textContent="Pagina "+(pgIndex+1)+" di "+totalPages;sheet.appendChild(pn);}' +
-          'var fi=document.createElement("img");fi.className="a4-footer";fi.src=footerSrc;fi.alt="";sheet.appendChild(fi);' +
-          'container.appendChild(sheet);' +
-        '});' +
-        'return pages.length;' +
-      '}' +
+      // Le funzioni di impaginazione vengono serializzate con .toString() dalle
+      // stesse funzioni live dell'app (non riscritte a mano): cosi' il file
+      // esportato si comporta SEMPRE esattamente come l'anteprima in-app,
+      // senza rischio che le due versioni divergano ad ogni correzione futura
+      // (era la causa piu' probabile dei vari bug di stampa risolti a fatica
+      // in passato: una copia veniva corretta e l'altra no).
+      'var LH_HEADER_RATIO = ' + LH_HEADER_RATIO + ';' +
+      'var LH_FOOTER_RATIO = ' + LH_FOOTER_RATIO + ';' +
+      'var _cmPx = null;' +
+      escapeHtml.toString() + ';' +
+      cmToPx.toString() + ';' +
+      buildItemHtml.toString() + ';' +
+      buildTitleHtml.toString() + ';' +
+      buildSectionHeaderHtml.toString() + ';' +
+      signatureLinesHtml.toString() + ';' +
+      computeA4Geometry.toString() + ';' +
+      flattenSectionsToBlocks.toString() + ';' +
+      measureBlocks.toString() + ';' +
+      packRange.toString() + ';' +
+      packPagesWithSignature.toString() + ';' +
+      renderA4Pages.toString() + ';' +
+      buildA4Sheets.toString() + ';' +
       'buildA4Sheets(document.getElementById("pages"), D.headerSrc, D.footerSrc, D.paziente, D.dataVal, D.note, D.sections, D.signatureLines);' +
       '<\/script>' +
       '</body></html>';
   }
 
-  var saveInProgress = false;
+  let saveInProgress = false;
 
   function downloadFallback(html, filename){
     var blob = new Blob([html], {type:"text/html"});
@@ -3885,8 +3811,8 @@
   }
 
   // ---------- SEARCH ----------
-  var searchInput = document.getElementById("searchInput");
-  var searchTimer = null;
+  let searchInput = document.getElementById("searchInput");
+  let searchTimer = null;
   searchInput.addEventListener("input", function(){
     clearTimeout(searchTimer);
     var v = searchInput.value;
@@ -3897,7 +3823,7 @@
   });
 
   // ---------- LIBRERIA SCHEDE (salvataggio multiplo, riutilizzabile offline) ----------
-  var LIB_KEY = "raccolta_esercizi_libreria_schede";
+  let LIB_KEY = "raccolta_esercizi_libreria_schede";
   function loadLibrary(){
     return SCHEDE_CACHE;
   }
@@ -4054,26 +3980,21 @@
   document.getElementById("libraryClose").onclick = closeLibrary;
   document.getElementById("libraryOverlay").addEventListener("click", function(ev){ if(ev.target===this) closeLibrary(); });
 
-  // ---------- CONDIVISIONE VIA LINK ----------
-  // La scheda viene codificata (paziente/data/note/id esercizi) in base64 nel
-  // frammento dell'URL (#s=...). Chi apre il link, sullo stesso sito, la vede
-  // subito: gli esercizi (nomi, immagini, descrizioni) arrivano dal database
-  // gia' incorporato nell'app (data.js), quindi il link resta corto anche
-  // con molte esercizi selezionati, e funziona offline se l'app e' gia'
-  // stata aperta almeno una volta su quel dispositivo.
-  function b64EncodeUnicode(str){
-    return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function(_, p1){
-      return String.fromCharCode(parseInt(p1, 16));
-    }));
-  }
+  // ---------- LETTURA SCHEDA CONDIVISA DA LINK ----------
+  // La scheda e' codificata (paziente/data/note/id esercizi) in base64 nel
+  // frammento dell'URL (#s=...): la usa initSharedView() per mostrare la
+  // vista di sola lettura. Gli esercizi (nomi, immagini, descrizioni)
+  // arrivano dal database gia' incorporato nell'app (data.js), quindi il
+  // link resta corto anche con molti esercizi selezionati, e funziona
+  // offline se l'app e' gia' stata aperta almeno una volta su quel
+  // dispositivo. (La generazione del link e l'importazione della scheda
+  // condivisa dentro l'app corrente sono state rimosse dall'interfaccia
+  // per un problema di funzionamento mai risolto: e' rimasta solo la
+  // visualizzazione, che apre il link in una pagina a se stante.)
   function b64DecodeUnicode(str){
     return decodeURIComponent(Array.prototype.map.call(atob(str), function(c){
       return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
     }).join(""));
-  }
-  function encodeSchedaForLink(s){
-    var payload = {n: s.nome||"", p: s.paziente||"", d: s.dataVal||"", no: s.note||"", i: s.ids||[], t: s.templateId||"__default__"};
-    return b64EncodeUnicode(JSON.stringify(payload));
   }
   function decodeSchedaFromLink(code){
     try{
@@ -4088,39 +4009,6 @@
       };
     }catch(e){ return null; }
   }
-  function shareLinkFor(s){
-    return location.origin + location.pathname + "#s=" + encodeSchedaForLink(s);
-  }
-  function openShareModal(s){
-    var input = document.getElementById("shareLinkInput");
-    input.value = shareLinkFor(s);
-    document.getElementById("shareOverlay").classList.add("open");
-    setTimeout(function(){ input.focus(); input.select(); }, 50);
-  }
-  // Il pulsante "Condividi link" e' stato rimosso dall'interfaccia (la
-  // funzione restava comunque disattivata per un problema di
-  // funzionamento mai risolto); il resto della logica di condivisione
-  // sotto resta inutilizzato ma innocuo.
-  document.getElementById("shareCloseBtn").onclick = function(){ document.getElementById("shareOverlay").classList.remove("open"); };
-  document.getElementById("shareOverlay").addEventListener("click", function(ev){ if(ev.target===this) this.classList.remove("open"); });
-  document.getElementById("shareCopyBtn").onclick = function(){
-    var input = document.getElementById("shareLinkInput");
-    input.select();
-    var copied = false;
-    try{
-      if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(input.value); copied = true; }
-    }catch(e){}
-    if(!copied){ try{ document.execCommand("copy"); copied = true; }catch(e){} }
-    var btn = document.getElementById("shareCopyBtn");
-    var orig = btn.textContent;
-    btn.textContent = copied ? "Copiato!" : "Seleziona e copia";
-    setTimeout(function(){ btn.textContent = orig; }, 1800);
-  };
-
-  // ---------- IMPORTAZIONE SCHEDA DA LINK ----------
-  // Il link "Condividi" rimanda direttamente alla sola scheda condivisa,
-  // mostrata subito in anteprima di sola lettura (non all'intera app).
-  var pendingImport = null;
   function itemsForIds(ids){
     return ids.map(function(id){
       var e = byId[id];
@@ -4128,63 +4016,6 @@
       return { imgSrc: e.img || "", nome: e.nome, quantita: e.quantita, descrizione: e.descrizione };
     }).filter(Boolean);
   }
-  function checkImportFromHash(){
-    var h = location.hash || "";
-    var m = h.match(/#s=(.+)$/);
-    if(!m) return;
-    var scheda = decodeSchedaFromLink(decodeURIComponent(m[1]));
-    if(!scheda || !scheda.ids || scheda.ids.length===0) return;
-    pendingImport = scheda;
-
-    var tpl = templateById(scheda.templateId || "__default__");
-    buildA4Sheets(
-      document.getElementById("previewPages"), tpl.headerUrl, tpl.footerUrl,
-      scheda.paziente, scheda.dataVal || new Date().toLocaleDateString("it-IT"),
-      scheda.note, itemsForIds(scheda.ids)
-    );
-    document.getElementById("previewOverlay").classList.add("open");
-
-    var n = scheda.ids.length;
-    var parts = [];
-    if(scheda.paziente) parts.push(scheda.paziente);
-    parts.push(n + (n===1 ? " esercizio" : " esercizi"));
-    document.getElementById("importBannerText").textContent =
-      "Stai vedendo una scheda condivisa (" + parts.join(" · ") + ").";
-    document.getElementById("importBanner").classList.add("open");
-  }
-  document.getElementById("importBannerAccept").onclick = function(){
-    if(!pendingImport) return;
-    var s = pendingImport;
-    fPaziente.value = s.paziente || "";
-    fData.value = s.dataVal || new Date().toLocaleDateString("it-IT");
-    fNote.value = s.note || "";
-    saveField("raccolta_esercizi_paziente", fPaziente.value);
-    saveField("raccolta_esercizi_data", fData.value);
-    saveField("raccolta_esercizi_note", fNote.value);
-    populateTemplateSelect(s.templateId || "__default__");
-    saveField("raccolta_esercizi_template", fTemplate.value);
-    populateSignatureSelect(s.signatureId || "__none__");
-    saveField("raccolta_esercizi_signature", fSignature.value);
-    state.selected = new Set(s.ids);
-    saveSelected(); updateSchedaCount(); renderDrawer(); renderGrid();
-    var list = loadLibrary();
-    list.unshift({
-      id: uid(), nome: s.nome || "Scheda condivisa", paziente: s.paziente, dataVal: s.dataVal,
-      note: s.note, ids: s.ids, templateId: s.templateId, signatureId: s.signatureId, createdAt: Date.now()
-    });
-    saveLibrary(list);
-    document.getElementById("importBanner").classList.remove("open");
-    document.getElementById("previewOverlay").classList.remove("open");
-    pendingImport = null;
-    history.replaceState(null, "", location.pathname + location.search);
-    openDrawer();
-  };
-  document.getElementById("importBannerDismiss").onclick = function(){
-    document.getElementById("importBanner").classList.remove("open");
-    document.getElementById("previewOverlay").classList.remove("open");
-    pendingImport = null;
-    history.replaceState(null, "", location.pathname + location.search);
-  };
 
   // ---------- STATO CONNESSIONE ----------
   function updateConnBadge(){
