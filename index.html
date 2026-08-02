@@ -296,7 +296,7 @@
   }
   .drawer-overlay.open{display:block;}
   .drawer{
-    position:fixed; top:0; right:-420px; width:400px; max-width:92vw; height:100vh;
+    position:fixed; top:0; right:-660px; width:640px; max-width:92vw; height:100vh;
     background:#fff; box-shadow:-6px 0 24px rgba(0,0,0,.15);
     z-index:95; transition:right .18s ease; display:flex; flex-direction:column;
   }
@@ -351,6 +351,10 @@
   .sched-section-head .sec-color{
     width:22px; height:22px; padding:0; border:1px solid var(--border); border-radius:5px;
     cursor:pointer; flex-shrink:0; background:none;
+  }
+  .sched-section-head .sec-columns{
+    flex-shrink:0; font-size:11.5px; padding:4px 6px; border:1px solid var(--border);
+    border-radius:6px; background:#fff; cursor:pointer;
   }
   .sched-section-head .sec-count{font-size:11px; color:var(--text-muted); flex-shrink:0;}
   .sched-section-head .sec-del{
@@ -670,15 +674,13 @@
   .a4-sheet .a4-header{flex-shrink:0; width:100%; display:block; margin-bottom:0.5cm;}
   .a4-sheet .a4-footer{flex-shrink:0; width:100%; display:block; margin-top:0.5cm;}
   .a4-sheet .a4-body{flex:1 1 auto; overflow:hidden;}
-  /* ---------- LAYOUT A DUE COLONNE (stampa) ----------
-     Le due colonne sono due div affiancati con flex (non CSS column-count:
-     quest'ultimo, con l'impaginazione a piu' pagine, e' proprio il tipo di
-     proprieta' che Safari gestisce in modo incoerente rispetto a Chrome in
-     stampa). Essendo semplici flex-child a larghezza fissa dentro un
-     .a4-sheet gia' correttamente dimensionato sul foglio A4 (vedi il fix
-     del bug di stampa sopra), il calcolo della larghezza resta corretto e
-     identico su entrambi i browser. Il gap qui DEVE combaciare con
-     COL_GAP_CM nella funzione buildA4Sheets in JS (misurazione blocchi). */
+  /* ---------- COPPIA DI ESERCIZI AFFIANCATI (sezioni a 2 colonne) ----------
+     Usato una volta per ogni COPPIA di esercizi (non piu' una volta per
+     intera colonna di pagina, vedi pairItemsHtml in JS): essendo un singolo
+     flex-row per coppia, le due celle partono sempre dalla stessa riga,
+     niente sfasamento verticale. Non si usa CSS column-count perche', con
+     l'impaginazione a piu' pagine, e' proprio il tipo di proprieta' che
+     Safari gestisce in modo incoerente rispetto a Chrome in stampa. */
   .a4-columns{display:flex; gap:0.8cm; align-items:flex-start;}
   .a4-col{flex:1 1 0; min-width:0;}
 
@@ -1191,7 +1193,7 @@
     state.selected = s;
   }
   function newSection(title){
-    return {id: "sec_" + Date.now().toString(36) + Math.random().toString(36).slice(2,5), title: title || "Nuova sezione", text: "", color: "#7a5c00", exerciseIds: []};
+    return {id: "sec_" + Date.now().toString(36) + Math.random().toString(36).slice(2,5), title: title || "Nuova sezione", text: "", color: "#7a5c00", columns: 2, exerciseIds: []};
   }
   // Alias di compatibilita': tutto il resto del codice richiama ancora
   // saveSelected() dopo aver modificato la scheda -- ora la vera fonte di
@@ -1461,7 +1463,16 @@
     return normalize(e.nome).indexOf(q)>=0 || normalize(e.descrizione).indexOf(q)>=0 || normalize(tagsOf(e.id)).indexOf(q)>=0;
   }
   function getFiltered(){
-    return CURRENT_EXERCISES.filter(function(e){ return pathMatches(e) && queryMatches(e); });
+    var list = CURRENT_EXERCISES.filter(function(e){ return pathMatches(e) && queryMatches(e); });
+    // Gli esercizi gia' scelti per la scheda salgono in cima (ordinamento
+    // stabile: l'ordine relativo tra selezionati e tra non selezionati non
+    // cambia), cosi' restano subito visibili senza dover scorrere la lista.
+    list.sort(function(a, b){
+      var as = state.selected.has(a.id) ? 0 : 1;
+      var bs = state.selected.has(b.id) ? 0 : 1;
+      return as - bs;
+    });
+    return list;
   }
 
   // ---------- GRID ----------
@@ -1502,8 +1513,7 @@
       star.onclick = function(ev){
         ev.stopPropagation();
         toggleSelected(e.id);
-        star.classList.toggle("active");
-        star.innerHTML = starSVG(state.selected.has(e.id));
+        renderGrid();
       };
       card.appendChild(star);
 
@@ -3142,6 +3152,14 @@
       colorInput.onclick = function(ev){ ev.stopPropagation(); };
       colorInput.oninput = function(){ sec.color = colorInput.value; saveSections(); };
       head.appendChild(colorInput);
+      var colsSelect = document.createElement("select");
+      colsSelect.className = "sec-columns";
+      colsSelect.title = "Colonne nella scheda stampata";
+      colsSelect.innerHTML = '<option value="2">2 colonne</option><option value="1">1 colonna</option>';
+      colsSelect.value = String(sec.columns || 2);
+      colsSelect.onclick = function(ev){ ev.stopPropagation(); };
+      colsSelect.onchange = function(){ sec.columns = parseInt(colsSelect.value, 10); saveSections(); };
+      head.appendChild(colsSelect);
       var cnt = document.createElement("span");
       cnt.className = "sec-count";
       cnt.textContent = (sec.exerciseIds||[]).length + " es.";
@@ -3296,6 +3314,17 @@
       '</div></div>';
   }
 
+  // Affianca due item (il secondo puo' mancare, per un numero dispari di
+  // esercizi in una sezione a 2 colonne) riusando le classi .a4-columns/.a4-col
+  // gia' definite in CSS: essendo un flex-row per singola coppia, le due
+  // celle partono sempre dalla stessa riga (nessuno sfasamento).
+  function pairItemsHtml(htmlA, htmlB){
+    var html = '<div class="a4-columns"><div class="a4-col">' + htmlA + '</div>';
+    if(htmlB) html += '<div class="a4-col">' + htmlB + '</div>';
+    html += '</div>';
+    return html;
+  }
+
   function buildTitleHtml(paziente, dataVal, note){
     return '<div class="print-head"><h1>Scheda esercizi</h1><div class="print-meta">' +
       (paziente ? '<span>Paziente: '+escapeHtml(paziente)+'</span>' : '') +
@@ -3321,21 +3350,11 @@
   // righe di logica tutte insieme.
 
   // Calcola le dimensioni fisse del foglio A4 (in px) e lo spazio realmente
-  // disponibile per i blocchi in una colonna, al netto di intestazione,
-  // piede pagina, numero di pagina e (se presente) firma.
+  // disponibile per le righe in una pagina, al netto di intestazione, piede
+  // pagina, numero di pagina e (se presente) firma.
   function computeA4Geometry(headerSrc, footerSrc, signatureLines){
     var contentWCm = 20.6 - 2*2; // larghezza foglio (ridotta di un margine di sicurezza) meno margini laterali (2cm ciascuno)
     var contentWPx = cmToPx(contentWCm);
-    // ---------- LAYOUT A DUE COLONNE ----------
-    // Sezioni ed esercizi vengono impaginati in due colonne affiancate per
-    // ridurre il numero di pagine. Le immagini restano alla dimensione
-    // originale (140x140px, vedi .pi-thumb in CSS): e' il testo a andare a
-    // capo su una colonna piu' stretta. Titolo scheda e firma restano
-    // invece a piena larghezza, sopra/sotto le due colonne (vedi CSS
-    // .a4-columns/.a4-col: il gap li' DEVE combaciare con COL_GAP_CM qui).
-    var COL_GAP_CM = 0.8;
-    var colWCm = (contentWCm - COL_GAP_CM) / 2;
-    var colWPx = cmToPx(colWCm);
     var pageInnerHPx = cmToPx(29.3 - 2*1); // altezza utile (foglio ridotto di sicurezza): meno margini sopra/sotto (1cm ciascuno)
     var headerHPx = headerSrc ? (cmToPx(contentWCm * LH_HEADER_RATIO) + cmToPx(0.5)) : 0;
     var footerHPx = footerSrc ? (cmToPx(contentWCm * LH_FOOTER_RATIO) + cmToPx(0.5)) : 0;
@@ -3350,34 +3369,50 @@
     // spazio per una firma che compare solo sull'ultima
     var avail = pageInnerHPx - headerHPx - footerHPx - pageNumH - cmToPx(0.9);
     var availWithSig = avail - signatureHPx;
-    return {contentWPx: contentWPx, colWPx: colWPx, avail: avail, availWithSig: availWithSig, hasSignature: hasSignature};
+    return {contentWPx: contentWPx, avail: avail, availWithSig: availWithSig, hasSignature: hasSignature};
   }
 
-  // "Appiattisce" le sezioni in una sequenza di blocchi HTML (intestazione di
-  // sezione + i suoi esercizi, uno via l'altro): la stessa sequenza di
-  // sempre, distribuita poi su due colonne invece che una.
+  // Trasforma le sezioni in una sequenza di RIGHE HTML autosufficienti, ognuna
+  // impaginata come unita' atomica (una riga non viene mai spezzata tra le
+  // due "celle" di una coppia): l'intestazione di sezione e, per le sezioni a
+  // 1 colonna, ogni singolo esercizio, occupano una riga a piena larghezza;
+  // per le sezioni a 2 colonne, gli esercizi vengono accoppiati due a due con
+  // pairItemsHtml (l'eventuale ultimo esercizio dispari resta da solo).
+  // Essendo ogni riga un unico blocco HTML gia' pronto (con dentro, se e' una
+  // coppia, il proprio mini flex-row a due celle), le due colonne di una
+  // stessa riga partono sempre allo stesso "top": niente piu' sfasamento.
   function flattenSectionsToBlocks(sections){
     var blocks = [];
     (sections||[]).forEach(function(sec){
       var headHtml = buildSectionHeaderHtml(sec.title, sec.text, sec.color);
       if(headHtml) blocks.push(headHtml);
-      (sec.items||[]).forEach(function(it){
-        blocks.push(buildItemHtml(it.imgSrc, it.nome, it.quantita, it.descrizione));
+      var itemHtmls = (sec.items||[]).map(function(it){
+        return buildItemHtml(it.imgSrc, it.nome, it.quantita, it.descrizione);
       });
+      if(sec.columns === 1){
+        itemHtmls.forEach(function(h){ blocks.push(h); });
+      } else {
+        for(var i = 0; i < itemHtmls.length; i += 2){
+          blocks.push(pairItemsHtml(itemHtmls[i], itemHtmls[i+1]));
+        }
+      }
     });
     return blocks;
   }
 
-  // "probe" invisibile per misurare l'altezza reale di ogni blocco (titolo
-  // scheda, intestazione di sezione, singolo esercizio): il titolo si misura
-  // a piena larghezza, i blocchi delle sezioni/esercizi alla larghezza di UNA
-  // colonna (colWPx), perche' e' li' che finiranno.
-  function measureBlocks(titleHtml, blocks, contentWPx, colWPx){
+  // "probe" invisibile per misurare l'altezza reale di ogni riga (titolo
+  // scheda, intestazione di sezione, esercizio a piena larghezza o coppia di
+  // esercizi affiancati): tutte le righe occupano l'intera larghezza
+  // contenuto quando renderizzate, quindi si misurano tutte alla stessa
+  // larghezza (contentWPx) -- la spartizione in due celle di una coppia
+  // avviene via CSS flex dentro la riga stessa, non serve piu' misurarla
+  // separatamente.
+  function measureBlocks(titleHtml, blocks, contentWPx){
     var probe = document.createElement("div");
     probe.style.cssText = "position:absolute; left:-99999px; top:0; visibility:hidden;";
+    probe.style.width = contentWPx + "px";
     document.body.appendChild(probe);
-    function measure(html, widthPx){
-      probe.style.width = widthPx + "px";
+    function measure(html){
       var d = document.createElement("div");
       d.innerHTML = html;
       probe.appendChild(d);
@@ -3385,17 +3420,14 @@
       probe.removeChild(d);
       return h;
     }
-    var titleH = blocks.length ? measure(titleHtml, contentWPx) : 0;
-    var blockHeights = blocks.map(function(html){ return measure(html, colWPx); });
+    var titleH = blocks.length ? measure(titleHtml) : 0;
+    var blockHeights = blocks.map(function(html){ return measure(html); });
     document.body.removeChild(probe);
     return {titleH: titleH, blockHeights: blockHeights};
   }
 
-  // Impagina i blocchi [startIdx..] in due colonne per pagina: ogni blocco va
-  // nella colonna al momento piu' "vuota" (bin-packing greedy); se ne' l'una
-  // ne' l'altra hanno piu' posto, si apre una pagina nuova. Una sezione che
-  // non entra intera in una colonna prosegue semplicemente nella
-  // colonna/pagina successiva, esattamente come un singolo esercizio.
+  // Impagina le righe [startIdx..] impilandole verticalmente per pagina: ogni
+  // riga si accoda finche' c'e' spazio, altrimenti si apre una pagina nuova.
   // "isDocFirstPage" indica se la PRIMA pagina generata da questa chiamata
   // puo' essere la primissima pagina della scheda (con titolo): e' true per
   // l'impaginazione principale, false quando la richiama
@@ -3407,49 +3439,37 @@
     var isFirstDocPage = isDocFirstPage;
     while(idx < blockHeights.length || (pgs.length === 0 && blockHeights.length === 0 && isDocFirstPage)){
       var pageAvail = pageAvailFn(isFirstDocPage);
-      var cols = [[], []], colUsed = [0, 0], order = [];
+      var used = 0, order = [];
       while(idx < blockHeights.length){
         var h = blockHeights[idx];
-        var hasContent = cols[0].length > 0 || cols[1].length > 0;
-        var target = colUsed[0] <= colUsed[1] ? 0 : 1;
-        if(hasContent && (colUsed[target] + h) > pageAvail){
-          var other = 1 - target;
-          if((colUsed[other] + h) <= pageAvail){
-            target = other;
-          } else {
-            break; // nessuna delle due colonne ha piu' posto: pagina chiusa
-          }
+        if(order.length > 0 && (used + h) > pageAvail){
+          break; // non c'e' piu' posto in questa pagina: pagina chiusa
         }
-        cols[target].push(idx);
-        colUsed[target] += h;
-        order.push({col: target, idx: idx});
+        order.push(idx);
+        used += h;
         idx++;
       }
-      pgs.push({cols: cols, colUsed: colUsed, order: order, isFirst: isFirstDocPage});
+      pgs.push({used: used, order: order, isFirst: isFirstDocPage});
       isFirstDocPage = false;
       if(blockHeights.length === 0) break;
     }
     return pgs;
   }
 
-  // Impagina tutti i blocchi e, se c'e' una firma, verifica che nell'ultima
-  // pagina ci sia davvero spazio anche per lei sotto la colonna piu' alta
-  // delle due; se non basta, sposta gli ultimi blocchi assegnati (in ordine
-  // cronologico, indipendentemente da quale colonna) su una nuova pagina
-  // finale, ricompattandoli di nuovo in due colonne.
+  // Impagina tutte le righe e, se c'e' una firma, verifica che nell'ultima
+  // pagina ci sia davvero spazio anche per lei sotto l'ultima riga; se non
+  // basta, sposta le ultime righe assegnate su una nuova pagina finale.
   function packPagesWithSignature(blockHeights, titleH, avail, availWithSig, hasSignature){
     var pages = packRange(blockHeights, 0, true, function(isFirst){ return isFirst ? (avail - titleH) : avail; });
     if(!hasSignature) return pages;
     var lastPage = pages[pages.length - 1];
     var effAvailWithSig = lastPage.isFirst ? (availWithSig - titleH) : availWithSig;
-    var lastMax = Math.max(lastPage.colUsed[0], lastPage.colUsed[1]);
-    if(lastMax > effAvailWithSig && lastPage.order.length > 0){
+    if(lastPage.used > effAvailWithSig && lastPage.order.length > 0){
       var overflowIdxs = [];
-      while(lastPage.order.length > 0 && Math.max(lastPage.colUsed[0], lastPage.colUsed[1]) > effAvailWithSig){
-        var moved = lastPage.order.pop();
-        lastPage.colUsed[moved.col] -= blockHeights[moved.idx];
-        lastPage.cols[moved.col].pop();
-        overflowIdxs.unshift(moved.idx);
+      while(lastPage.order.length > 0 && lastPage.used > effAvailWithSig){
+        var movedIdx = lastPage.order.pop();
+        lastPage.used -= blockHeights[movedIdx];
+        overflowIdxs.unshift(movedIdx);
       }
       if(overflowIdxs.length){
         var overflowPages = packRange(blockHeights, overflowIdxs[0], false, function(){ return avail; });
@@ -3461,7 +3481,7 @@
 
   // Disegna in "container" un <div class="a4-sheet"> per ogni pagina calcolata
   // da packPagesWithSignature: intestazione/piede pagina (se presenti), titolo
-  // scheda (solo sulla prima pagina), le due colonne di blocchi, il numero di
+  // scheda (solo sulla prima pagina), le righe impilate, il numero di
   // pagina (se ce n'e' piu' di una) e la firma (solo sull'ultima).
   function renderA4Pages(container, pages, blocks, titleHtml, headerSrc, footerSrc, hasSignature, signatureLines){
     var totalPages = pages.length;
@@ -3481,13 +3501,7 @@
       body.className = "a4-body";
       var bodyHtml = "";
       if(pg.isFirst) bodyHtml += titleHtml;
-      bodyHtml += '<div class="a4-columns">';
-      [0, 1].forEach(function(c){
-        bodyHtml += '<div class="a4-col">';
-        pg.cols[c].forEach(function(i){ bodyHtml += blocks[i]; });
-        bodyHtml += '</div>';
-      });
-      bodyHtml += '</div>';
+      pg.order.forEach(function(i){ bodyHtml += blocks[i]; });
       body.innerHTML = bodyHtml;
       if(hasSignature && pgIndex === totalPages - 1){
         var sigWrap = document.createElement("div");
@@ -3530,18 +3544,18 @@
     var geo = computeA4Geometry(headerSrc, footerSrc, signatureLines);
     var blocks = flattenSectionsToBlocks(sections);
     var titleHtml = buildTitleHtml(paziente, dataVal, note);
-    var measured = measureBlocks(titleHtml, blocks, geo.contentWPx, geo.colWPx);
+    var measured = measureBlocks(titleHtml, blocks, geo.contentWPx);
 
     console.log("[DIAGNOSTICA SCHEDA] sezioni ricevute:", (sections||[]).length,
-      "| blocchi totali generati:", blocks.length,
+      "| righe totali generate:", blocks.length,
       "| avail (px):", Math.round(geo.avail), "| availWithSig (px):", Math.round(geo.availWithSig),
       "| titleH (px):", Math.round(measured.titleH),
-      "| altezze blocchi (px):", measured.blockHeights.map(function(h){ return Math.round(h); }));
+      "| altezze righe (px):", measured.blockHeights.map(function(h){ return Math.round(h); }));
 
     var pages = packPagesWithSignature(measured.blockHeights, measured.titleH, geo.avail, geo.availWithSig, geo.hasSignature);
 
     console.log("[DIAGNOSTICA SCHEDA] pagine risultanti:", pages.length,
-      "| blocchi per colonna per pagina:", pages.map(function(p){ return [p.cols[0].length, p.cols[1].length]; }));
+      "| righe per pagina:", pages.map(function(p){ return p.order.length; }));
 
     renderA4Pages(container, pages, blocks, titleHtml, headerSrc, footerSrc, geo.hasSignature, signatureLines);
 
@@ -3560,7 +3574,7 @@
         if(!e) return null;
         return { imgSrc: photosOf(id, e.img)[0] || "", nome: e.nome, quantita: e.quantita, descrizione: e.descrizione };
       }).filter(Boolean);
-      return { title: sec.title || "", text: sec.text || "", color: sec.color || "", items: items };
+      return { title: sec.title || "", text: sec.text || "", color: sec.color || "", columns: sec.columns || 2, items: items };
     }).filter(function(sec){ return sec.items.length > 0 || sec.text; });
   }
 
@@ -3758,7 +3772,7 @@
     }
     var sections = (srcSections||[]).map(function(sec){
       var items = (sec.exerciseIds||[]).map(resolveItem).filter(Boolean);
-      return {title: sec.title||"", text: sec.text||"", color: sec.color||"", items: items};
+      return {title: sec.title||"", text: sec.text||"", color: sec.color||"", columns: sec.columns||2, items: items};
     }).filter(function(sec){ return sec.items.length > 0 || sec.text; });
 
     var title = "Scheda esercizi" + (paziente ? " - " + paziente : "") + " - " + dataVal;
@@ -3820,6 +3834,7 @@
       escapeHtml.toString() + ';' +
       cmToPx.toString() + ';' +
       buildItemHtml.toString() + ';' +
+      pairItemsHtml.toString() + ';' +
       buildTitleHtml.toString() + ';' +
       buildSectionHeaderHtml.toString() + ';' +
       signatureLinesHtml.toString() + ';' +
