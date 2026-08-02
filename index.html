@@ -313,9 +313,14 @@
   }
   .drawer-list{flex:1; overflow-y:auto; padding:10px 14px;}
   .drawer-item{
-    display:flex; gap:10px; align-items:center; padding:8px; border-radius:8px;
+    display:flex; flex-direction:column; gap:6px; padding:8px; border-radius:8px;
   }
   .drawer-item:hover{background:var(--bg);}
+  .drawer-item .di-row{display:flex; gap:10px; align-items:center;}
+  .drawer-item .di-note{
+    width:100%; box-sizing:border-box; border:1px solid var(--border); border-radius:6px;
+    padding:5px 8px; font-size:12px; font-family:inherit;
+  }
   .drawer-item img{width:44px; height:44px; object-fit:cover; border-radius:6px; flex-shrink:0; background:#eee;}
   .drawer-item .di-name{font-size:13px; font-weight:600; flex:1; line-height:1.3;}
   .drawer-item .di-remove{
@@ -624,7 +629,7 @@
     break-inside:avoid;
   }
   .print-item .pi-thumb{
-    width:140px; height:140px; flex:0 0 140px; display:flex;
+    width:120px; height:120px; flex:0 0 120px; display:flex;
     align-items:center; justify-content:center; overflow:hidden; border-radius:6px;
   }
   .print-item .pi-thumb img{width:100%; height:100%; object-fit:contain; display:block;}
@@ -1193,7 +1198,7 @@
     state.selected = s;
   }
   function newSection(title){
-    return {id: "sec_" + Date.now().toString(36) + Math.random().toString(36).slice(2,5), title: title || "Nuova sezione", text: "", color: "#7a5c00", columns: 2, exerciseIds: []};
+    return {id: "sec_" + Date.now().toString(36) + Math.random().toString(36).slice(2,5), title: title || "Nuova sezione", text: "", color: "#7a5c00", columns: 2, exerciseIds: [], itemNotes: {}};
   }
   // Alias di compatibilita': tutto il resto del codice richiama ancora
   // saveSelected() dopo aver modificato la scheda -- ora la vera fonte di
@@ -3200,12 +3205,14 @@
           if(!e) return;
           var row = document.createElement("div");
           row.className = "drawer-item";
+          var topRow = document.createElement("div");
+          topRow.className = "di-row";
           var img = document.createElement("img");
           img.src = photosOf(id, e.img)[0] || ""; img.alt = e.nome;
-          row.appendChild(img);
+          topRow.appendChild(img);
           var name = document.createElement("div");
           name.className = "di-name"; name.textContent = e.nome;
-          row.appendChild(name);
+          topRow.appendChild(name);
           var upBtn = document.createElement("button");
           upBtn.className = "di-move"; upBtn.title = "Sposta su";
           upBtn.disabled = idx === 0;
@@ -3216,7 +3223,7 @@
             var tmp = arr[idx-1]; arr[idx-1] = arr[idx]; arr[idx] = tmp;
             saveSections(); renderDrawer();
           };
-          row.appendChild(upBtn);
+          topRow.appendChild(upBtn);
           var downBtn = document.createElement("button");
           downBtn.className = "di-move"; downBtn.title = "Sposta giu'";
           downBtn.disabled = idx === sec.exerciseIds.length - 1;
@@ -3227,15 +3234,28 @@
             var tmp = arr[idx+1]; arr[idx+1] = arr[idx]; arr[idx] = tmp;
             saveSections(); renderDrawer();
           };
-          row.appendChild(downBtn);
+          topRow.appendChild(downBtn);
           var rm = document.createElement("button");
           rm.className = "di-remove";
           rm.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
           rm.onclick = function(){
             sec.exerciseIds = sec.exerciseIds.filter(function(x){ return x !== id; });
+            if(sec.itemNotes) delete sec.itemNotes[id];
             recomputeSelected(); saveSections(); updateSchedaCount(); renderDrawer(); renderGrid();
           };
-          row.appendChild(rm);
+          topRow.appendChild(rm);
+          row.appendChild(topRow);
+          var noteInput = document.createElement("input");
+          noteInput.type = "text";
+          noteInput.className = "di-note";
+          noteInput.placeholder = "Nota per questo esercizio (opzionale, stampata solo se compilata)";
+          noteInput.value = (sec.itemNotes && sec.itemNotes[id]) || "";
+          noteInput.oninput = function(){
+            if(!sec.itemNotes) sec.itemNotes = {};
+            sec.itemNotes[id] = noteInput.value;
+            saveSections();
+          };
+          row.appendChild(noteInput);
           body.appendChild(row);
         });
       }
@@ -3304,13 +3324,13 @@
     return cm * _cmPx;
   }
 
-  function buildItemHtml(imgSrc, nome, quantita, descrizione){
+  function buildItemHtml(imgSrc, nome, quantita, descrizione, note){
     return '<div class="print-item">' +
       '<div class="pi-thumb">' + (imgSrc ? '<img src="'+escapeHtml(imgSrc)+'" alt="">' : "") + '</div>' +
       '<div class="pi-text"><h4>'+escapeHtml(nome)+'</h4>' +
       (quantita ? '<div class="pq">'+escapeHtml(quantita)+'</div>' : "") +
       '<p>'+escapeHtml(descrizione || "")+'</p>' +
-      '<div class="pnotes">Note: ______________________________________________</div>' +
+      (note ? '<div class="pnotes">Note: '+escapeHtml(note)+'</div>' : "") +
       '</div></div>';
   }
 
@@ -3381,19 +3401,23 @@
   // Essendo ogni riga un unico blocco HTML gia' pronto (con dentro, se e' una
   // coppia, il proprio mini flex-row a due celle), le due colonne di una
   // stessa riga partono sempre allo stesso "top": niente piu' sfasamento.
+  // Ogni riga e' un oggetto {html, isHeader, sectionIndex}, non una stringa
+  // nuda: isHeader/sectionIndex servono solo a packRange per evitare che
+  // un'intestazione di sezione resti "vedova" da sola in fondo pagina (vedi
+  // sotto); il rendering usa sempre e solo .html.
   function flattenSectionsToBlocks(sections){
     var blocks = [];
-    (sections||[]).forEach(function(sec){
+    (sections||[]).forEach(function(sec, secIdx){
       var headHtml = buildSectionHeaderHtml(sec.title, sec.text, sec.color);
-      if(headHtml) blocks.push(headHtml);
+      if(headHtml) blocks.push({html: headHtml, isHeader: true, sectionIndex: secIdx});
       var itemHtmls = (sec.items||[]).map(function(it){
-        return buildItemHtml(it.imgSrc, it.nome, it.quantita, it.descrizione);
+        return buildItemHtml(it.imgSrc, it.nome, it.quantita, it.descrizione, it.note);
       });
       if(sec.columns === 1){
-        itemHtmls.forEach(function(h){ blocks.push(h); });
+        itemHtmls.forEach(function(h){ blocks.push({html: h, isHeader: false, sectionIndex: secIdx}); });
       } else {
         for(var i = 0; i < itemHtmls.length; i += 2){
-          blocks.push(pairItemsHtml(itemHtmls[i], itemHtmls[i+1]));
+          blocks.push({html: pairItemsHtml(itemHtmls[i], itemHtmls[i+1]), isHeader: false, sectionIndex: secIdx});
         }
       }
     });
@@ -3421,7 +3445,7 @@
       return h;
     }
     var titleH = blocks.length ? measure(titleHtml) : 0;
-    var blockHeights = blocks.map(function(html){ return measure(html); });
+    var blockHeights = blocks.map(function(b){ return measure(b.html); });
     document.body.removeChild(probe);
     return {titleH: titleH, blockHeights: blockHeights};
   }
@@ -3433,7 +3457,7 @@
   // l'impaginazione principale, false quando la richiama
   // packPagesWithSignature per ricollocare un eventuale "trabocco" dovuto
   // alla firma, che non e' mai la primissima pagina.
-  function packRange(blockHeights, startIdx, isDocFirstPage, pageAvailFn){
+  function packRange(blockHeights, blocks, startIdx, isDocFirstPage, pageAvailFn){
     var pgs = [];
     var idx = startIdx;
     var isFirstDocPage = isDocFirstPage;
@@ -3444,6 +3468,20 @@
         var h = blockHeights[idx];
         if(order.length > 0 && (used + h) > pageAvail){
           break; // non c'e' piu' posto in questa pagina: pagina chiusa
+        }
+        // "vedova" di sezione: se questa riga e' un'intestazione e c'e' gia'
+        // altro contenuto sopra in questa pagina, non lasciarla da sola senza
+        // il primo esercizio della sua stessa sezione -- meglio spostare
+        // entrambi alla pagina successiva. Su una pagina ancora vuota
+        // (order.length===0) la regola non si applica: l'intestazione va
+        // messa comunque, non c'e' altrove dove metterla.
+        if(order.length > 0 && blocks[idx].isHeader){
+          var nextIdx = idx + 1;
+          if(nextIdx < blockHeights.length && blocks[nextIdx].sectionIndex === blocks[idx].sectionIndex){
+            if((used + h + blockHeights[nextIdx]) > pageAvail){
+              break;
+            }
+          }
         }
         order.push(idx);
         used += h;
@@ -3459,8 +3497,8 @@
   // Impagina tutte le righe e, se c'e' una firma, verifica che nell'ultima
   // pagina ci sia davvero spazio anche per lei sotto l'ultima riga; se non
   // basta, sposta le ultime righe assegnate su una nuova pagina finale.
-  function packPagesWithSignature(blockHeights, titleH, avail, availWithSig, hasSignature){
-    var pages = packRange(blockHeights, 0, true, function(isFirst){ return isFirst ? (avail - titleH) : avail; });
+  function packPagesWithSignature(blockHeights, blocks, titleH, avail, availWithSig, hasSignature){
+    var pages = packRange(blockHeights, blocks, 0, true, function(isFirst){ return isFirst ? (avail - titleH) : avail; });
     if(!hasSignature) return pages;
     var lastPage = pages[pages.length - 1];
     var effAvailWithSig = lastPage.isFirst ? (availWithSig - titleH) : availWithSig;
@@ -3472,7 +3510,7 @@
         overflowIdxs.unshift(movedIdx);
       }
       if(overflowIdxs.length){
-        var overflowPages = packRange(blockHeights, overflowIdxs[0], false, function(){ return avail; });
+        var overflowPages = packRange(blockHeights, blocks, overflowIdxs[0], false, function(){ return avail; });
         pages = pages.concat(overflowPages);
       }
     }
@@ -3501,7 +3539,7 @@
       body.className = "a4-body";
       var bodyHtml = "";
       if(pg.isFirst) bodyHtml += titleHtml;
-      pg.order.forEach(function(i){ bodyHtml += blocks[i]; });
+      pg.order.forEach(function(i){ bodyHtml += blocks[i].html; });
       body.innerHTML = bodyHtml;
       if(hasSignature && pgIndex === totalPages - 1){
         var sigWrap = document.createElement("div");
@@ -3552,7 +3590,7 @@
       "| titleH (px):", Math.round(measured.titleH),
       "| altezze righe (px):", measured.blockHeights.map(function(h){ return Math.round(h); }));
 
-    var pages = packPagesWithSignature(measured.blockHeights, measured.titleH, geo.avail, geo.availWithSig, geo.hasSignature);
+    var pages = packPagesWithSignature(measured.blockHeights, blocks, measured.titleH, geo.avail, geo.availWithSig, geo.hasSignature);
 
     console.log("[DIAGNOSTICA SCHEDA] pagine risultanti:", pages.length,
       "| righe per pagina:", pages.map(function(p){ return p.order.length; }));
@@ -3572,7 +3610,7 @@
       var items = (sec.exerciseIds||[]).map(function(id){
         var e = byId[id];
         if(!e) return null;
-        return { imgSrc: photosOf(id, e.img)[0] || "", nome: e.nome, quantita: e.quantita, descrizione: e.descrizione };
+        return { imgSrc: photosOf(id, e.img)[0] || "", nome: e.nome, quantita: e.quantita, descrizione: e.descrizione, note: (sec.itemNotes && sec.itemNotes[id]) || "" };
       }).filter(Boolean);
       return { title: sec.title || "", text: sec.text || "", color: sec.color || "", columns: sec.columns || 2, items: items };
     }).filter(function(sec){ return sec.items.length > 0 || sec.text; });
@@ -3760,7 +3798,7 @@
     var haveImgData = await ensureImgDataLoaded();
     var imgData = getImgData();
 
-    function resolveItem(id){
+    function resolveItem(id, sec){
       var ex = byId[id];
       if(!ex) return null;
       var imgSrc = "";
@@ -3768,10 +3806,11 @@
         var b64 = haveImgData && imgData ? imgData[String(ex.id)] : null;
         imgSrc = b64 || ("../" + ex.img); // fallback: percorso relativo, valido solo dentro Schede_Salvate
       }
-      return {imgSrc: imgSrc, nome: ex.nome, quantita: ex.quantita, descrizione: ex.descrizione};
+      var note = (sec.itemNotes && sec.itemNotes[id]) || "";
+      return {imgSrc: imgSrc, nome: ex.nome, quantita: ex.quantita, descrizione: ex.descrizione, note: note};
     }
     var sections = (srcSections||[]).map(function(sec){
-      var items = (sec.exerciseIds||[]).map(resolveItem).filter(Boolean);
+      var items = (sec.exerciseIds||[]).map(function(id){ return resolveItem(id, sec); }).filter(Boolean);
       return {title: sec.title||"", text: sec.text||"", color: sec.color||"", columns: sec.columns||2, items: items};
     }).filter(function(sec){ return sec.items.length > 0 || sec.text; });
 
@@ -3800,7 +3839,7 @@
       '.print-section-head h3{margin:0 0 4px;font-size:15px;color:#7a5c00;}' +
       '.print-section-head .section-text{margin:0;font-size:11.5px;color:#555;line-height:1.4;}' +
       '.print-item{display:flex;gap:14px;padding:8px 0;border-bottom:1px solid #ddd;break-inside:avoid;}' +
-      '.print-item .pi-thumb{width:140px;height:140px;flex:0 0 140px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:6px;}' +
+      '.print-item .pi-thumb{width:120px;height:120px;flex:0 0 120px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:6px;}' +
       '.print-item .pi-thumb img{width:100%;height:100%;object-fit:contain;display:block;}' +
       '.print-item .pi-text{flex:1;min-width:0;}' +
       '.print-item h4{margin:0 0 4px;font-size:14px;}' +
