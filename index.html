@@ -296,7 +296,7 @@
   }
   .drawer-overlay.open{display:block;}
   .drawer{
-    position:fixed; top:0; right:-660px; width:640px; max-width:92vw; height:100vh;
+    position:fixed; top:0; right:-1020px; width:1000px; max-width:95vw; height:100vh;
     background:#fff; box-shadow:-6px 0 24px rgba(0,0,0,.15);
     z-index:95; transition:right .18s ease; display:flex; flex-direction:column;
   }
@@ -306,7 +306,10 @@
     display:flex; align-items:center; justify-content:space-between;
   }
   .drawer-head h3{margin:0; font-size:16px;}
-  .drawer-fields{padding:14px 18px; border-bottom:1px solid var(--border); display:flex; flex-direction:column; gap:8px;}
+  .drawer-body{flex:1; display:flex; overflow:hidden;}
+  .drawer-col-left{width:300px; flex-shrink:0; overflow-y:auto; border-right:1px solid var(--border);}
+  .drawer-col-right{flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden;}
+  .drawer-fields{padding:14px 18px; display:flex; flex-direction:column; gap:8px;}
   .drawer-fields label{font-size:11.5px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.03em;}
   .drawer-fields input, .drawer-fields textarea{
     width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:7px; font-size:13.5px; font-family:inherit;
@@ -317,6 +320,10 @@
   }
   .drawer-item:hover{background:var(--bg);}
   .drawer-item .di-row{display:flex; gap:10px; align-items:center;}
+  .drawer-item .di-serie-rep{
+    width:100%; box-sizing:border-box; border:1px solid var(--border); border-radius:6px;
+    padding:5px 8px; font-size:12px; font-family:inherit;
+  }
   .drawer-item .di-note{
     width:100%; box-sizing:border-box; border:1px solid var(--border); border-radius:6px;
     padding:5px 8px; font-size:12px; font-family:inherit;
@@ -637,6 +644,7 @@
   .print-item h4{margin:0 0 4px; font-size:14px;}
   .print-item .pq{font-size:12px; font-weight:700; color:#000; margin-bottom:3px;}
   .print-item p{margin:0; font-size:12px; color:#333; line-height:1.4;}
+  .print-item .pi-serierep{margin-top:5px; font-size:12px; font-weight:700; color:#7a5c00;}
   .print-item .pnotes{margin-top:6px; font-size:11.5px; color:#888; border-top:1px dashed #ccc; padding-top:4px;}
   .a4-page-number{
     text-align:center; font-size:10.5px; color:#888; margin-top:0.3cm; flex-shrink:0;
@@ -924,32 +932,38 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
   </div>
-  <div class="drawer-fields">
-    <div>
-      <label>Paziente</label>
-      <input id="fPaziente" type="text" placeholder="Nome paziente (opzionale)">
+  <div class="drawer-body">
+    <div class="drawer-col-left">
+      <div class="drawer-fields">
+        <div>
+          <label>Paziente</label>
+          <input id="fPaziente" type="text" placeholder="Nome paziente (opzionale)">
+        </div>
+        <div>
+          <label>Data</label>
+          <input id="fData" type="text" placeholder="gg/mm/aaaa">
+        </div>
+        <div>
+          <label>Note</label>
+          <textarea id="fNote" rows="2" placeholder="Note generali sulla scheda (opzionale)"></textarea>
+        </div>
+        <div>
+          <label>Modello / carta intestata</label>
+          <select id="fTemplate"></select>
+        </div>
+        <div>
+          <label>Firma a fine scheda</label>
+          <select id="fSignature"></select>
+        </div>
+      </div>
     </div>
-    <div>
-      <label>Data</label>
-      <input id="fData" type="text" placeholder="gg/mm/aaaa">
-    </div>
-    <div>
-      <label>Note</label>
-      <textarea id="fNote" rows="2" placeholder="Note generali sulla scheda (opzionale)"></textarea>
-    </div>
-    <div>
-      <label>Modello / carta intestata</label>
-      <select id="fTemplate"></select>
-    </div>
-    <div>
-      <label>Firma a fine scheda</label>
-      <select id="fSignature"></select>
+    <div class="drawer-col-right">
+      <div class="drawer-sections-bar">
+        <button class="btn" id="addSectionBtn">+ Nuova sezione</button>
+      </div>
+      <div class="drawer-list" id="drawerList"></div>
     </div>
   </div>
-  <div class="drawer-sections-bar">
-    <button class="btn" id="addSectionBtn">+ Nuova sezione</button>
-  </div>
-  <div class="drawer-list" id="drawerList"></div>
   <div class="drawer-foot drawer-foot-col">
     <div class="drawer-foot-row">
       <button class="btn" id="previewSchedaBtn">Anteprima</button>
@@ -1198,7 +1212,7 @@
     state.selected = s;
   }
   function newSection(title){
-    return {id: "sec_" + Date.now().toString(36) + Math.random().toString(36).slice(2,5), title: title || "Nuova sezione", text: "", color: "#7a5c00", columns: 2, exerciseIds: [], itemNotes: {}};
+    return {id: "sec_" + Date.now().toString(36) + Math.random().toString(36).slice(2,5), title: title || "Nuova sezione", text: "", color: "#7a5c00", columns: 2, exerciseIds: [], itemNotes: {}, itemSerieRep: {}};
   }
   // Alias di compatibilita': tutto il resto del codice richiama ancora
   // saveSelected() dopo aver modificato la scheda -- ora la vera fonte di
@@ -2459,7 +2473,18 @@
         else if(h > maxSize){ w = Math.round(w * maxSize / h); h = maxSize; }
         var canvas = document.createElement("canvas");
         canvas.width = w; canvas.height = h;
-        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        var ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, w, h);
+        // Le immagini degli esercizi sono in bianco e nero: convertiamo qui
+        // in scala di grigi cosi' i nuovi caricamenti sono coerenti con il
+        // catalogo di base (che viene convertito offline da aggiorna_app.py).
+        var imgData = ctx.getImageData(0, 0, w, h);
+        var d = imgData.data;
+        for(var i = 0; i < d.length; i += 4){
+          var l = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+          d[i] = d[i+1] = d[i+2] = l;
+        }
+        ctx.putImageData(imgData, 0, 0);
         cb(canvas.toDataURL("image/jpeg", 0.82));
       };
       img.src = ev.target.result;
@@ -3241,10 +3266,22 @@
           rm.onclick = function(){
             sec.exerciseIds = sec.exerciseIds.filter(function(x){ return x !== id; });
             if(sec.itemNotes) delete sec.itemNotes[id];
+            if(sec.itemSerieRep) delete sec.itemSerieRep[id];
             recomputeSelected(); saveSections(); updateSchedaCount(); renderDrawer(); renderGrid();
           };
           topRow.appendChild(rm);
           row.appendChild(topRow);
+          var serieRepInput = document.createElement("input");
+          serieRepInput.type = "text";
+          serieRepInput.className = "di-serie-rep";
+          serieRepInput.placeholder = "N° serie/rep (es. 3x12)";
+          serieRepInput.value = (sec.itemSerieRep && sec.itemSerieRep[id]) || "";
+          serieRepInput.oninput = function(){
+            if(!sec.itemSerieRep) sec.itemSerieRep = {};
+            sec.itemSerieRep[id] = serieRepInput.value;
+            saveSections();
+          };
+          row.appendChild(serieRepInput);
           var noteInput = document.createElement("input");
           noteInput.type = "text";
           noteInput.className = "di-note";
@@ -3324,12 +3361,13 @@
     return cm * _cmPx;
   }
 
-  function buildItemHtml(imgSrc, nome, quantita, descrizione, note){
+  function buildItemHtml(imgSrc, nome, quantita, descrizione, serieRep, note){
     return '<div class="print-item">' +
       '<div class="pi-thumb">' + (imgSrc ? '<img src="'+escapeHtml(imgSrc)+'" alt="">' : "") + '</div>' +
       '<div class="pi-text"><h4>'+escapeHtml(nome)+'</h4>' +
       (quantita ? '<div class="pq">'+escapeHtml(quantita)+'</div>' : "") +
       '<p>'+escapeHtml(descrizione || "")+'</p>' +
+      (serieRep ? '<div class="pi-serierep">'+escapeHtml(serieRep)+'</div>' : "") +
       (note ? '<div class="pnotes">Note: '+escapeHtml(note)+'</div>' : "") +
       '</div></div>';
   }
@@ -3411,7 +3449,7 @@
       var headHtml = buildSectionHeaderHtml(sec.title, sec.text, sec.color);
       if(headHtml) blocks.push({html: headHtml, isHeader: true, sectionIndex: secIdx});
       var itemHtmls = (sec.items||[]).map(function(it){
-        return buildItemHtml(it.imgSrc, it.nome, it.quantita, it.descrizione, it.note);
+        return buildItemHtml(it.imgSrc, it.nome, it.quantita, it.descrizione, it.serieRep, it.note);
       });
       if(sec.columns === 1){
         itemHtmls.forEach(function(h){ blocks.push({html: h, isHeader: false, sectionIndex: secIdx}); });
@@ -3610,7 +3648,7 @@
       var items = (sec.exerciseIds||[]).map(function(id){
         var e = byId[id];
         if(!e) return null;
-        return { imgSrc: photosOf(id, e.img)[0] || "", nome: e.nome, quantita: e.quantita, descrizione: e.descrizione, note: (sec.itemNotes && sec.itemNotes[id]) || "" };
+        return { imgSrc: photosOf(id, e.img)[0] || "", nome: e.nome, quantita: e.quantita, descrizione: e.descrizione, serieRep: (sec.itemSerieRep && sec.itemSerieRep[id]) || "", note: (sec.itemNotes && sec.itemNotes[id]) || "" };
       }).filter(Boolean);
       return { title: sec.title || "", text: sec.text || "", color: sec.color || "", columns: sec.columns || 2, items: items };
     }).filter(function(sec){ return sec.items.length > 0 || sec.text; });
@@ -3807,7 +3845,8 @@
         imgSrc = b64 || ("../" + ex.img); // fallback: percorso relativo, valido solo dentro Schede_Salvate
       }
       var note = (sec.itemNotes && sec.itemNotes[id]) || "";
-      return {imgSrc: imgSrc, nome: ex.nome, quantita: ex.quantita, descrizione: ex.descrizione, note: note};
+      var serieRep = (sec.itemSerieRep && sec.itemSerieRep[id]) || "";
+      return {imgSrc: imgSrc, nome: ex.nome, quantita: ex.quantita, descrizione: ex.descrizione, serieRep: serieRep, note: note};
     }
     var sections = (srcSections||[]).map(function(sec){
       var items = (sec.exerciseIds||[]).map(function(id){ return resolveItem(id, sec); }).filter(Boolean);
@@ -3845,6 +3884,7 @@
       '.print-item h4{margin:0 0 4px;font-size:14px;}' +
       '.print-item .pq{font-size:12px;font-weight:700;color:#000;margin-bottom:3px;}' +
       '.print-item p{margin:0;font-size:12px;color:#333;line-height:1.4;}' +
+      '.print-item .pi-serierep{margin-top:5px;font-size:12px;font-weight:700;color:#7a5c00;}' +
       '.print-item .pnotes{margin-top:6px;font-size:11.5px;color:#888;border-top:1px dashed #ccc;padding-top:4px;}' +
       '.a4-page-number{text-align:center;font-size:10.5px;color:#888;margin-top:0.3cm;flex-shrink:0;}' +
       '.a4-signature-wrap{margin-top:0.6cm;padding-top:0.4cm;border-top:1px solid #ddd;display:flex;justify-content:flex-end;}' +
@@ -3940,21 +3980,35 @@
       return;
     }
     var cur = currentSchedaData();
-    var suggestion = cur.paziente ? (cur.paziente + " - " + cur.dataVal) : ("Scheda " + cur.dataVal);
+    var pazienteTrim = cur.paziente.trim().toLowerCase();
+    var existing = pazienteTrim ? SCHEDE_CACHE.find(function(s){
+      return (s.paziente || "").trim().toLowerCase() === pazienteTrim;
+    }) : null;
+    var suggestion = existing ? existing.nome : (cur.paziente ? (cur.paziente + " - " + cur.dataVal) : ("Scheda " + cur.dataVal));
     var nome = prompt("Nome della scheda:", suggestion);
     if(nome===null) return;
     nome = nome.trim() || suggestion;
     var statusEl = document.getElementById("saveStatus");
+    if(existing){
+      var ok = confirm("Esiste gia' una scheda per il paziente \"" + cur.paziente + "\" (\"" + existing.nome + "\"). Sovrascriverla?");
+      if(!ok){
+        statusEl.textContent = "Salvataggio annullato.";
+        setTimeout(function(){ statusEl.textContent=""; }, 3000);
+        return;
+      }
+    }
     statusEl.textContent = "Salvataggio in corso...";
-    schedeColRef.doc(uid()).set({
+    var docId = existing ? existing.id : uid();
+    schedeColRef.doc(docId).set({
       nome: nome, paziente: cur.paziente, dataVal: cur.dataVal,
       note: cur.note, ids: cur.ids, sections: cur.sections, templateId: cur.templateId, signatureId: cur.signatureId,
-      createdAt: Date.now(),
-      createdByName: currentEditorName || currentUserEmail || "sconosciuto",
-      createdByEmail: currentUserEmail || ""
+      createdAt: existing ? (existing.createdAt || Date.now()) : Date.now(),
+      updatedAt: Date.now(),
+      createdByName: existing ? (existing.createdByName || currentEditorName || currentUserEmail || "sconosciuto") : (currentEditorName || currentUserEmail || "sconosciuto"),
+      createdByEmail: existing ? (existing.createdByEmail || currentUserEmail || "") : (currentUserEmail || "")
     }).then(function(){
-      logAction("Scheda salvata in libreria", nome);
-      statusEl.textContent = "Scheda salvata nella libreria.";
+      logAction(existing ? "Scheda sovrascritta in libreria" : "Scheda salvata in libreria", nome);
+      statusEl.textContent = existing ? "Scheda aggiornata nella libreria." : "Scheda salvata nella libreria.";
       setTimeout(function(){ statusEl.textContent=""; }, 3000);
     }).catch(function(err){
       statusEl.textContent = "";
