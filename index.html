@@ -1271,7 +1271,7 @@
   let SHARED_MODE = /#s=/.test(location.hash || "");
   if(SHARED_MODE) document.body.classList.add("shared-mode");
 
-  let FIRESTORE_OVERRIDES = {deletedIds: [], folders: {}, moves: {}, treeRenames: {}, customFolders: [], tags: {}, textOverrides: {}};
+  let FIRESTORE_OVERRIDES = {deletedIds: [], folders: {}, moves: {}, treeRenames: {}, customFolders: [], tags: {}, textOverrides: {}, childOrder: {}};
   // Gli esercizi aggiunti a mano (con le loro eventuali foto) vivono in una
   // collezione separata (un documento Firestore per esercizio, non piu' tutti
   // ammassati nell'unico documento overrides/catalog): cosi' le foto non
@@ -1417,6 +1417,42 @@
   }
   let TREE = buildTree();
 
+  // ---------- ORDINE PERSONALIZZATO DELLE SOTTOCARTELLE ----------
+  // Per default le sottocartelle appaiono nell'ordine in cui compaiono nei
+  // Word (piu' le cartelle vuote create a mano, in coda). Quando l'utente
+  // usa "Sposta su"/"Sposta giu'" per un distretto, si salva un ordine
+  // esplicito per QUEI fratelli (chiave = distretto + percorso del genitore),
+  // condiviso via Firestore come le altre modifiche all'albero. I distretti
+  // principali (Arto Inferiore/Superiore, Core e Tronco) non sono riordinabili.
+  function siblingOrderKey(area, parentPath){
+    return "O::" + area + "::" + parentPath.join("/");
+  }
+  function sortedChildKeys(area, parentPath, childrenObj){
+    var keys = Object.keys(childrenObj);
+    var order = (FIRESTORE_OVERRIDES.childOrder || {})[siblingOrderKey(area, parentPath)];
+    if(!order || !order.length) return keys;
+    var known = order.filter(function(k){ return keys.indexOf(k) >= 0; });
+    var rest = keys.filter(function(k){ return order.indexOf(k) < 0; });
+    return known.concat(rest);
+  }
+  // Sposta la sottocartella "path" di una posizione su/giu' tra i suoi
+  // fratelli (stesso genitore) e salva il nuovo ordine completo dei fratelli.
+  function moveSiblingFolder(area, path, direction){
+    var parentPath = path.slice(0, -1);
+    var myKey = path[path.length - 1];
+    var parentNode = TREE[area];
+    for(var i=0;i<parentPath.length;i++){ parentNode = parentNode.children[parentPath[i]]; }
+    var siblingKeys = sortedChildKeys(area, parentPath, parentNode.children);
+    var idx = siblingKeys.indexOf(myKey);
+    var swapWith = idx + direction;
+    if(idx < 0 || swapWith < 0 || swapWith >= siblingKeys.length) return;
+    var newOrder = siblingKeys.slice();
+    var tmp = newOrder[idx]; newOrder[idx] = newOrder[swapWith]; newOrder[swapWith] = tmp;
+    var orderMap = {}; for(var k in (FIRESTORE_OVERRIDES.childOrder||{})) orderMap[k] = FIRESTORE_OVERRIDES.childOrder[k];
+    orderMap[siblingOrderKey(area, parentPath)] = newOrder;
+    saveOverridesToFirestore({childOrder: orderMap}).catch(function(err){ alert("Errore: " + err.message); });
+  }
+
   function isActiveNode(area, path){
     if(state.area !== area) return false;
     if(state.path.length !== path.length) return false;
@@ -1492,7 +1528,7 @@
     wrap.appendChild(row);
     wrap.appendChild(childWrap);
 
-    Object.keys(node.children).forEach(function(child){
+    sortedChildKeys(area, path, node.children).forEach(function(child){
       childWrap.appendChild(buildNode(child, node.children[child], area, path.concat([child]), depth+1));
     });
 
@@ -2212,7 +2248,8 @@
           treeRenames: data.treeRenames || {},
           customFolders: data.customFolders || [],
           tags: data.tags || {},
-          textOverrides: data.textOverrides || {}
+          textOverrides: data.textOverrides || {},
+          childOrder: data.childOrder || {}
         };
         rebuildAll();
         if(isEditor) migrateLegacyTextOverrides();
@@ -3013,6 +3050,33 @@
     };
     menu.appendChild(renameItem);
     if(isSubfolder){
+      var parentPath = path.slice(0, -1);
+      var parentNode = TREE[area];
+      for(var pi=0; pi<parentPath.length; pi++){ parentNode = parentNode.children[parentPath[pi]]; }
+      var siblingKeys = sortedChildKeys(area, parentPath, parentNode.children);
+      var myIdx = siblingKeys.indexOf(path[path.length - 1]);
+      if(myIdx > 0){
+        var upItem = document.createElement("button");
+        upItem.type = "button";
+        upItem.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg> Sposta su';
+        upItem.onclick = function(ev){
+          ev.stopPropagation();
+          closeTreeActionMenu();
+          moveSiblingFolder(area, path, -1);
+        };
+        menu.appendChild(upItem);
+      }
+      if(myIdx >= 0 && myIdx < siblingKeys.length - 1){
+        var downItem = document.createElement("button");
+        downItem.type = "button";
+        downItem.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg> Sposta giù';
+        downItem.onclick = function(ev){
+          ev.stopPropagation();
+          closeTreeActionMenu();
+          moveSiblingFolder(area, path, 1);
+        };
+        menu.appendChild(downItem);
+      }
       var moveItem = document.createElement("button");
       moveItem.type = "button";
       moveItem.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 3 21 3 21 8"/><line x1="21" y1="3" x2="14" y2="10"/><path d="M21 14v5a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h5"/></svg> Sposta';
@@ -3226,7 +3290,19 @@
       var renames = {}; for(var k in (FIRESTORE_OVERRIDES.treeRenames||{})) renames[k] = FIRESTORE_OVERRIDES.treeRenames[k];
       var key = findRenameKey(area, path);
       renames[key] = newLabel;
-      saveOverridesToFirestore({treeRenames: renames}).then(function(){
+      var renamePatch = {treeRenames: renames};
+      // se questa cartella aveva un ordine esplicito tra i suoi fratelli,
+      // aggiorna anche li' il nome cosi' non perde la posizione scelta
+      if(path.length > 0){
+        var orderKey = siblingOrderKey(area, path.slice(0, -1));
+        var existingOrder = (FIRESTORE_OVERRIDES.childOrder||{})[orderKey];
+        if(existingOrder && existingOrder.indexOf(currentLabel) >= 0){
+          var orderMap2 = {}; for(var k2 in (FIRESTORE_OVERRIDES.childOrder||{})) orderMap2[k2] = FIRESTORE_OVERRIDES.childOrder[k2];
+          orderMap2[orderKey] = existingOrder.map(function(k3){ return k3 === currentLabel ? newLabel : k3; });
+          renamePatch.childOrder = orderMap2;
+        }
+      }
+      saveOverridesToFirestore(renamePatch).then(function(){
         logAction("Rinomina cartella", '"' + currentLabel + '" \u2192 "' + newLabel + '"');
         showToast('Cartella rinominata in "' + newLabel + '".');
       }).catch(function(err){
