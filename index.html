@@ -102,13 +102,18 @@
 
   /* ---------- LAYOUT ---------- */
   .layout{flex:1; display:flex; min-height:0;}
+  .tree-col{
+    width:270px; flex-shrink:0; display:flex; flex-direction:column;
+    background:var(--panel); border-right:1px solid var(--border); min-height:0;
+  }
+  .tree-col-actions{padding:10px 8px; border-bottom:1px solid var(--border); flex-shrink:0;}
+  .tree-col-actions .tools-menu-wrap{width:100%;}
+  .tree-col-actions .tools-menu-wrap .btn{width:100%; justify-content:center;}
   aside.tree-panel{
-    width:270px;
-    flex-shrink:0;
-    background:var(--panel);
-    border-right:1px solid var(--border);
+    flex:1;
     overflow-y:auto;
     padding:14px 8px 40px;
+    min-height:0;
   }
   main.content{
     flex:1;
@@ -309,11 +314,23 @@
   .drawer-body{flex:1; display:flex; overflow:hidden;}
   .drawer-col-left{width:300px; flex-shrink:0; overflow-y:auto; border-right:1px solid var(--border);}
   .drawer-col-right{flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden;}
-  .drawer-fields{padding:14px 18px; display:flex; flex-direction:column; gap:8px;}
+  .drawer-fields{padding:14px 18px; display:flex; flex-direction:column; gap:8px; height:100%; box-sizing:border-box;}
   .drawer-fields label{font-size:11.5px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.03em;}
   .drawer-fields input, .drawer-fields textarea{
     width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:7px; font-size:13.5px; font-family:inherit;
   }
+  .note-field-wrap{flex:1; display:flex; flex-direction:column; min-height:160px;}
+  .note-toolbar{display:flex; gap:4px; margin-bottom:4px;}
+  .note-toolbar button{
+    flex-shrink:0; width:26px; height:26px; border-radius:6px; border:1px solid var(--border);
+    background:#fff; cursor:pointer; font-size:12px; display:flex; align-items:center; justify-content:center;
+  }
+  .note-toolbar button.on{background:var(--accent-dark); color:#fff; border-color:var(--accent-dark);}
+  #fNote{
+    flex:1; overflow-y:auto; padding:8px 10px; border:1px solid var(--border); border-radius:7px;
+    font-size:13.5px; font-family:inherit; line-height:1.4; background:#fff;
+  }
+  #fNote:empty:before{content:attr(data-placeholder); color:var(--text-muted);}
   .drawer-list{flex:1; overflow-y:auto; padding:10px 14px;}
   .drawer-item{
     display:flex; flex-direction:column; gap:6px; padding:8px; border-radius:8px;
@@ -819,7 +836,6 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     esercizio
   </button>
-  <button class="btn editor-only" id="editTreeBtn">Nuova cartella</button>
   <div class="tools-menu-wrap editor-only">
     <button class="btn" id="toolsMenuBtn">
       Tool
@@ -849,7 +865,20 @@
 </header>
 
 <div class="layout">
-  <aside class="tree-panel" id="treePanel"></aside>
+  <div class="tree-col">
+    <div class="tree-col-actions editor-only">
+      <div class="tools-menu-wrap">
+        <button class="btn" id="treeActionsBtn">
+          Azioni cartelle
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="tools-menu" id="treeActionsMenu">
+          <button type="button" id="editTreeBtn">Nuova cartella</button>
+        </div>
+      </div>
+    </div>
+    <aside class="tree-panel" id="treePanel"></aside>
+  </div>
   <main class="content">
     <div class="content-header">
       <div>
@@ -943,9 +972,14 @@
           <label>Data</label>
           <input id="fData" type="text" placeholder="gg/mm/aaaa">
         </div>
-        <div>
+        <div class="note-field-wrap">
           <label>Note</label>
-          <textarea id="fNote" rows="2" placeholder="Note generali sulla scheda (opzionale)"></textarea>
+          <div class="note-toolbar">
+            <button type="button" data-cmd="bold" title="Grassetto"><b>B</b></button>
+            <button type="button" data-cmd="italic" title="Corsivo"><i>I</i></button>
+            <button type="button" data-cmd="underline" title="Sottolineato"><u>U</u></button>
+          </div>
+          <div id="fNote" contenteditable="true" data-placeholder="Note generali sulla scheda (opzionale)"></div>
         </div>
         <div>
           <label>Modello / carta intestata</label>
@@ -1102,15 +1136,16 @@
     </div>
     <div class="lib-body">
       <div id="templatesList"></div>
-      <h4 style="margin:18px 0 8px; font-size:14px;">Carica un nuovo modello</h4>
+      <h4 style="margin:18px 0 8px; font-size:14px;" id="tplFormTitle">Carica un nuovo modello</h4>
       <label for="newTplNome">Nome del modello</label>
       <input type="text" id="newTplNome" placeholder="Es. Studio Rossi">
-      <label for="newTplHeader">Immagine intestazione (facoltativa)</label>
+      <label for="newTplHeader" id="newTplHeaderLabel">Immagine intestazione (facoltativa)</label>
       <input type="file" id="newTplHeader" accept="image/*">
-      <label for="newTplFooter">Immagine piè di pagina (facoltativa)</label>
+      <label for="newTplFooter" id="newTplFooterLabel">Immagine piè di pagina (facoltativa)</label>
       <input type="file" id="newTplFooter" accept="image/*">
       <div class="err-text" id="templatesError"></div>
       <div class="modal-actions">
+        <button class="btn" id="cancelTplEditBtn" style="display:none;">Annulla modifica</button>
         <button class="btn primary" id="uploadTplBtn">Carica modello</button>
       </div>
     </div>
@@ -1128,12 +1163,13 @@
     </div>
     <div class="lib-body">
       <div id="signaturesList"></div>
-      <h4 style="margin:18px 0 8px; font-size:14px;">Crea una nuova firma</h4>
+      <h4 style="margin:18px 0 8px; font-size:14px;" id="sigFormTitle">Crea una nuova firma</h4>
       <label for="newSigNome">Nome di questa firma (per ritrovarla nell'elenco)</label>
       <input type="text" id="newSigNome" placeholder="Es. Dott. Rossi">
       <div id="newSigLines"></div>
       <div class="err-text" id="signaturesError"></div>
       <div class="modal-actions">
+        <button class="btn" id="cancelSigEditBtn" style="display:none;">Annulla modifica</button>
         <button class="btn primary" id="uploadSigBtn">Salva firma</button>
       </div>
     </div>
@@ -2568,6 +2604,8 @@
     }).catch(function(err){ console.error("Errore caricamento modelli:", err); });
   }
 
+  let editingTemplateId = null; // id del modello in modifica, null = si sta caricando un modello nuovo
+
   function renderTemplatesList(){
     var box = document.getElementById("templatesList");
     box.innerHTML = "";
@@ -2582,12 +2620,30 @@
       if(t.id.indexOf("__") !== 0){
         var actions = document.createElement("div");
         actions.className = "lc-actions";
+        var rename = document.createElement("button");
+        rename.className = "btn"; rename.textContent = "Rinomina";
+        rename.onclick = function(){
+          var nuovoNome = prompt("Nuovo nome del modello:", t.nome);
+          if(nuovoNome===null) return;
+          nuovoNome = nuovoNome.trim();
+          if(!nuovoNome || nuovoNome===t.nome) return;
+          firebase.firestore().collection("templates").doc(t.id).update({ nome: nuovoNome }).then(function(){
+            logAction("Rinominato modello carta intestata", t.nome + " → " + nuovoNome);
+            loadTemplatesFromFirestore();
+          }).catch(function(err){ alert("Errore: " + err.message); });
+        };
+        actions.appendChild(rename);
+        var edit = document.createElement("button");
+        edit.className = "btn"; edit.textContent = "Modifica";
+        edit.onclick = function(){ startEditTemplate(t); };
+        actions.appendChild(edit);
         var del = document.createElement("button");
         del.className = "btn danger"; del.textContent = "Elimina";
         del.onclick = function(){
           if(!confirm('Eliminare il modello "'+t.nome+'"?')) return;
           firebase.firestore().collection("templates").doc(t.id).delete().then(function(){
             logAction("Eliminato modello carta intestata", t.nome);
+            if(editingTemplateId === t.id) cancelEditTemplate();
             loadTemplatesFromFirestore();
           }).catch(function(err){ alert("Errore: " + err.message); });
         };
@@ -2596,6 +2652,33 @@
       }
       box.appendChild(row);
     });
+  }
+  // Mette il modulo "Carica un nuovo modello" in modalita' modifica: il nome
+  // viene precompilato, le immagini restano quelle esistenti a meno che
+  // l'utente non ne scelga di nuove.
+  function startEditTemplate(t){
+    editingTemplateId = t.id;
+    document.getElementById("tplFormTitle").textContent = "Modifica modello";
+    document.getElementById("newTplNome").value = t.nome;
+    document.getElementById("newTplHeader").value = "";
+    document.getElementById("newTplFooter").value = "";
+    document.getElementById("newTplHeaderLabel").textContent = "Nuova immagine intestazione (lascia vuoto per non cambiarla)";
+    document.getElementById("newTplFooterLabel").textContent = "Nuova immagine piè di pagina (lascia vuoto per non cambiarla)";
+    document.getElementById("uploadTplBtn").textContent = "Salva modifiche";
+    document.getElementById("cancelTplEditBtn").style.display = "";
+    document.getElementById("templatesError").textContent = "";
+  }
+  function cancelEditTemplate(){
+    editingTemplateId = null;
+    document.getElementById("tplFormTitle").textContent = "Carica un nuovo modello";
+    document.getElementById("newTplNome").value = "";
+    document.getElementById("newTplHeader").value = "";
+    document.getElementById("newTplFooter").value = "";
+    document.getElementById("newTplHeaderLabel").textContent = "Immagine intestazione (facoltativa)";
+    document.getElementById("newTplFooterLabel").textContent = "Immagine piè di pagina (facoltativa)";
+    document.getElementById("uploadTplBtn").textContent = "Carica modello";
+    document.getElementById("cancelTplEditBtn").style.display = "none";
+    document.getElementById("templatesError").textContent = "";
   }
 
   function fileToDataUrl(file){
@@ -2609,16 +2692,14 @@
 
   document.getElementById("manageTemplatesBtn").onclick = function(){
     if(!isEditor) return;
-    document.getElementById("newTplNome").value = "";
-    document.getElementById("newTplHeader").value = "";
-    document.getElementById("newTplFooter").value = "";
-    document.getElementById("templatesError").textContent = "";
+    cancelEditTemplate();
     renderTemplatesList();
     document.getElementById("templatesOverlay").classList.add("open");
   };
   document.getElementById("templatesClose").onclick = function(){
     document.getElementById("templatesOverlay").classList.remove("open");
   };
+  document.getElementById("cancelTplEditBtn").onclick = function(){ cancelEditTemplate(); };
   function resizeImageToDataUrlPromise(file, maxSize){
     return new Promise(function(resolve){
       var reader = new FileReader();
@@ -2648,7 +2729,7 @@
     btn.disabled = true;
     errEl.textContent = "Caricamento in corso...";
     try{
-      var templateId = "t_" + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+      var isEdit = !!editingTemplateId;
       // Le immagini vengono ridotte e salvate direttamente dentro Firestore
       // (come base64): niente Firebase Storage, quindi niente bisogno del
       // piano a pagamento "Blaze" -- restiamo sul piano gratuito "Spark".
@@ -2660,15 +2741,25 @@
         btn.disabled = false;
         return;
       }
-      await firebase.firestore().collection("templates").doc(templateId).set({
-        nome: nome, headerUrl: headerUrl, footerUrl: footerUrl,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-      logAction("Nuovo modello carta intestata", nome);
+      if(isEdit){
+        // in modifica si aggiornano solo i campi effettivamente cambiati:
+        // il nome sempre, le immagini solo se ne e' stata scelta una nuova
+        // (altrimenti restano quelle gia' salvate per quel modello).
+        var updateData = { nome: nome };
+        if(headerFile) updateData.headerUrl = headerUrl;
+        if(footerFile) updateData.footerUrl = footerUrl;
+        await firebase.firestore().collection("templates").doc(editingTemplateId).update(updateData);
+        logAction("Modificato modello carta intestata", nome);
+      } else {
+        var templateId = "t_" + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+        await firebase.firestore().collection("templates").doc(templateId).set({
+          nome: nome, headerUrl: headerUrl, footerUrl: footerUrl,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        logAction("Nuovo modello carta intestata", nome);
+      }
       errEl.textContent = "";
-      document.getElementById("newTplNome").value = "";
-      document.getElementById("newTplHeader").value = "";
-      document.getElementById("newTplFooter").value = "";
+      cancelEditTemplate();
       loadTemplatesFromFirestore();
     }catch(err){
       errEl.textContent = "Errore durante il caricamento: " + err.message;
@@ -2679,6 +2770,7 @@
 
   // ---------- FIRME A FINE SCHEDA (testo formattato, fino a 3 righe) ----------
   let SIGNATURES_CACHE = [];
+  let editingSignatureId = null; // id della firma in modifica, null = si sta creando una firma nuova
   let signaturesColRef = (typeof FIREBASE_ENABLED !== "undefined" && FIREBASE_ENABLED) ? firebase.firestore().collection("signatures") : null;
   function allSignatures(){
     return [{id: "__none__", nome: "Nessuna firma", lines: []}].concat(SIGNATURES_CACHE);
@@ -2739,12 +2831,17 @@
       row.appendChild(info);
       var actions = document.createElement("div");
       actions.className = "lc-actions";
+      var edit = document.createElement("button");
+      edit.className = "btn"; edit.textContent = "Modifica";
+      edit.onclick = function(){ startEditSignature(s); };
+      actions.appendChild(edit);
       var del = document.createElement("button");
       del.className = "btn danger"; del.textContent = "Elimina";
       del.onclick = function(){
         if(!confirm('Eliminare la firma "'+s.nome+'"?')) return;
         signaturesColRef.doc(s.id).delete().then(function(){
           logAction("Eliminata firma", s.nome);
+          if(editingSignatureId === s.id) cancelEditSignature();
           loadSignaturesFromFirestore();
         }).catch(function(err){ alert("Errore: " + err.message); });
       };
@@ -2752,6 +2849,36 @@
       row.appendChild(actions);
       box.appendChild(row);
     });
+  }
+  // Popola il modulo "Crea una nuova firma" con i dati di una firma
+  // esistente e lo mette in modalita' modifica (invece di crearne una nuova,
+  // il salvataggio aggiorna la firma esistente).
+  function startEditSignature(s){
+    editingSignatureId = s.id;
+    document.getElementById("sigFormTitle").textContent = "Modifica firma";
+    document.getElementById("newSigNome").value = s.nome;
+    buildSigLineRows();
+    var rows = document.querySelectorAll("#newSigLines .sig-line-row");
+    rows.forEach(function(row, i){
+      var line = (s.lines || [])[i];
+      if(!line) return;
+      row.querySelector(".sig-line-input").value = line.text || "";
+      var toggles = row.querySelectorAll(".sig-toggle");
+      if(line.bold) toggles[0].classList.add("on");
+      if(line.italic) toggles[1].classList.add("on");
+    });
+    document.getElementById("uploadSigBtn").textContent = "Salva modifiche";
+    document.getElementById("cancelSigEditBtn").style.display = "";
+    document.getElementById("signaturesError").textContent = "";
+  }
+  function cancelEditSignature(){
+    editingSignatureId = null;
+    document.getElementById("sigFormTitle").textContent = "Crea una nuova firma";
+    document.getElementById("newSigNome").value = "";
+    buildSigLineRows();
+    document.getElementById("uploadSigBtn").textContent = "Salva firma";
+    document.getElementById("cancelSigEditBtn").style.display = "none";
+    document.getElementById("signaturesError").textContent = "";
   }
   // Le 3 righe editabili (testo + grassetto/corsivo) nel modulo "Crea una nuova firma"
   function buildSigLineRows(){
@@ -2780,8 +2907,7 @@
   }
   document.getElementById("manageSignaturesBtn").onclick = function(){
     if(!isEditor) return;
-    document.getElementById("newSigNome").value = "";
-    buildSigLineRows();
+    cancelEditSignature();
     document.getElementById("signaturesError").textContent = "";
     renderSignaturesList();
     document.getElementById("signaturesOverlay").classList.add("open");
@@ -2789,6 +2915,7 @@
   document.getElementById("signaturesClose").onclick = function(){
     document.getElementById("signaturesOverlay").classList.remove("open");
   };
+  document.getElementById("cancelSigEditBtn").onclick = function(){ cancelEditSignature(); };
   document.getElementById("uploadSigBtn").onclick = function(){
     var nome = document.getElementById("newSigNome").value.trim();
     var errEl = document.getElementById("signaturesError");
@@ -2805,15 +2932,17 @@
     var btn = document.getElementById("uploadSigBtn");
     btn.disabled = true;
     errEl.textContent = "Salvataggio in corso...";
-    var sigId = "s_" + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
-    signaturesColRef.doc(sigId).set({
-      nome: nome, lines: lines,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    }).then(function(){
-      logAction("Nuova firma", nome);
+    var isEdit = !!editingSignatureId;
+    var savePromise = isEdit
+      ? signaturesColRef.doc(editingSignatureId).update({ nome: nome, lines: lines })
+      : signaturesColRef.doc("s_" + Date.now().toString(36) + Math.random().toString(36).slice(2,6)).set({
+          nome: nome, lines: lines,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    savePromise.then(function(){
+      logAction(isEdit ? "Modificata firma" : "Nuova firma", nome);
       errEl.textContent = "";
-      document.getElementById("newSigNome").value = "";
-      buildSigLineRows();
+      cancelEditSignature();
       loadSignaturesFromFirestore();
       showToast('Firma "' + nome + '" salvata.');
     }).catch(function(err){
@@ -2853,6 +2982,22 @@
     if(ev.target.tagName === "BUTTON") closeToolsMenu();
   });
   document.addEventListener("click", closeToolsMenu);
+
+  // ---------- MENU A TENDINA "AZIONI CARTELLE" (sopra l'albero) ----------
+  // Per ora contiene solo "Nuova cartella"; pensato per accogliere in futuro
+  // altre azioni a livello di albero (es. riordino cartelle).
+  function closeTreeActionsMenu(){
+    document.getElementById("treeActionsMenu").classList.remove("open");
+  }
+  document.getElementById("treeActionsBtn").onclick = function(ev){
+    ev.stopPropagation();
+    document.getElementById("treeActionsMenu").classList.toggle("open");
+  };
+  document.getElementById("treeActionsMenu").addEventListener("click", function(ev){
+    ev.stopPropagation();
+    if(ev.target.tagName === "BUTTON") closeTreeActionsMenu();
+  });
+  document.addEventListener("click", closeTreeActionsMenu);
 
   function openTreeActionMenu(row, anchorBtn, label, area, path, isSubfolder){
     if(openTreeMenuEl){ closeTreeActionMenu(); return; }
@@ -3319,19 +3464,46 @@
       saveSections(); updateSchedaCount(); renderDrawer(); renderGrid();
       fPaziente.value = "";
       saveField("raccolta_esercizi_paziente", "");
+      fData.value = new Date().toLocaleDateString("it-IT");
+      saveField("raccolta_esercizi_data", fData.value);
+      fNote.innerHTML = "";
+      saveField("raccolta_esercizi_note", "");
+      updateNoteToolbarState();
     }
   };
 
   // campi paziente/data/note persistenti
   let fPaziente = document.getElementById("fPaziente");
   let fData = document.getElementById("fData");
-  let fNote = document.getElementById("fNote");
+  let fNote = document.getElementById("fNote"); // contenteditable: contenuto = HTML (grassetto/corsivo/sottolineato)
   fPaziente.value = loadField("raccolta_esercizi_paziente", "");
-  fData.value = loadField("raccolta_esercizi_data", new Date().toLocaleDateString("it-IT"));
-  fNote.value = loadField("raccolta_esercizi_note", "");
+  // la data si aggiorna sempre a oggi all'apertura dell'app (non resta
+  // "congelata" all'ultima modifica salvata) -- resta comunque modificabile
+  fData.value = new Date().toLocaleDateString("it-IT");
+  saveField("raccolta_esercizi_data", fData.value);
+  fNote.innerHTML = loadField("raccolta_esercizi_note", "");
   fPaziente.oninput = function(){ saveField("raccolta_esercizi_paziente", fPaziente.value); };
   fData.oninput = function(){ saveField("raccolta_esercizi_data", fData.value); };
-  fNote.oninput = function(){ saveField("raccolta_esercizi_note", fNote.value); };
+  fNote.oninput = function(){ saveField("raccolta_esercizi_note", fNote.innerHTML); };
+  document.querySelectorAll(".note-toolbar button[data-cmd]").forEach(function(btn){
+    btn.onmousedown = function(ev){ ev.preventDefault(); }; // non toglie il focus/la selezione dal campo note
+    btn.onclick = function(){
+      document.execCommand(btn.dataset.cmd, false, null);
+      fNote.focus();
+      saveField("raccolta_esercizi_note", fNote.innerHTML);
+      updateNoteToolbarState();
+    };
+  });
+  function updateNoteToolbarState(){
+    document.querySelectorAll(".note-toolbar button[data-cmd]").forEach(function(btn){
+      var active = false;
+      try{ active = document.queryCommandState(btn.dataset.cmd); }catch(e){}
+      btn.classList.toggle("on", active);
+    });
+  }
+  fNote.addEventListener("keyup", updateNoteToolbarState);
+  fNote.addEventListener("mouseup", updateNoteToolbarState);
+  fNote.addEventListener("focus", updateNoteToolbarState);
 
   let fTemplate = document.getElementById("fTemplate");
   populateTemplateSelect(loadField("raccolta_esercizi_template", "__default__"));
@@ -3384,10 +3556,13 @@
   }
 
   function buildTitleHtml(paziente, dataVal, note){
+    // "note" arriva dal campo Note generale (contenteditable con B/I/U): e'
+    // gia' HTML formattato dall'editor, va inserito cosi' com'e' (non va
+    // ri-scappato come testo semplice, altrimenti si vedrebbero i tag).
     return '<div class="print-head"><h1>Scheda esercizi</h1><div class="print-meta">' +
       (paziente ? '<span>Paziente: '+escapeHtml(paziente)+'</span>' : '') +
       '<span>Data: '+escapeHtml(dataVal)+'</span></div>' +
-      (note ? '<div class="print-note">'+escapeHtml(note)+'</div>' : '') +
+      (note ? '<div class="print-note">'+note+'</div>' : '') +
       '</div>';
   }
 
@@ -3661,7 +3836,7 @@
     buildA4Sheets(
       document.getElementById("printPages"), tpl.headerUrl, tpl.footerUrl,
       fPaziente.value, fData.value || new Date().toLocaleDateString("it-IT"),
-      fNote.value, currentItemsForPrint(), sig.lines
+      fNote.innerHTML, currentItemsForPrint(), sig.lines
     );
     document.title = schedaFilename(fPaziente.value).replace(/\.html$/, "");
 
@@ -3734,7 +3909,7 @@
     buildA4Sheets(
       document.getElementById("previewPages"), tpl.headerUrl, tpl.footerUrl,
       fPaziente.value, fData.value || new Date().toLocaleDateString("it-IT"),
-      fNote.value, currentItemsForPrint(), sig.lines
+      fNote.innerHTML, currentItemsForPrint(), sig.lines
     );
   }
 
@@ -3830,7 +4005,7 @@
     var signatureLines = sig.lines || [];
     var paziente = (override && override.paziente !== undefined) ? override.paziente : (fPaziente.value || "");
     var dataVal = (override && override.dataVal) ? override.dataVal : (fData.value || new Date().toLocaleDateString("it-IT"));
-    var note = (override && override.note !== undefined) ? override.note : (fNote.value || "");
+    var note = (override && override.note !== undefined) ? override.note : (fNote.innerHTML || "");
     var srcSections = (override && override.sections) ? override.sections : state.sections;
 
     var haveImgData = await ensureImgDataLoaded();
@@ -3966,7 +4141,7 @@
     return {
       paziente: fPaziente.value || "",
       dataVal: fData.value || new Date().toLocaleDateString("it-IT"),
-      note: fNote.value || "",
+      note: fNote.innerHTML || "",
       ids: Array.from(state.selected),
       sections: JSON.parse(JSON.stringify(state.sections)),
       templateId: fTemplate.value || "__default__",
@@ -4057,11 +4232,14 @@
       openBtn.className = "btn primary"; openBtn.textContent = "Apri";
       openBtn.onclick = function(){
         fPaziente.value = s.paziente || "";
-        fData.value = s.dataVal || "";
-        fNote.value = s.note || "";
+        // riaprendo una scheda salvata la data si aggiorna a oggi (la data
+        // originale resta comunque salvata nella scheda in libreria)
+        fData.value = new Date().toLocaleDateString("it-IT");
+        fNote.innerHTML = s.note || "";
+        updateNoteToolbarState();
         saveField("raccolta_esercizi_paziente", fPaziente.value);
         saveField("raccolta_esercizi_data", fData.value);
-        saveField("raccolta_esercizi_note", fNote.value);
+        saveField("raccolta_esercizi_note", fNote.innerHTML);
         populateTemplateSelect(s.templateId || "__default__");
         saveField("raccolta_esercizi_template", fTemplate.value);
         populateSignatureSelect(s.signatureId || "__none__");
