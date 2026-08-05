@@ -429,18 +429,28 @@
     display:flex; align-items:center; justify-content:space-between; flex-shrink:0;
   }
   .lib-head h3{margin:0; font-size:17px;}
+  .lib-head-actions{display:flex; align-items:center; gap:10px;}
+  .lib-head-actions select{
+    padding:6px 8px; border:1px solid var(--border); border-radius:8px;
+    font-size:12.5px; font-family:inherit; background:var(--bg); color:var(--text);
+  }
   .lib-body{padding:14px 22px 22px; overflow-y:auto;}
   .lib-empty{color:var(--text-muted); font-size:13.5px; text-align:center; padding:50px 10px;}
   .lib-card{
     border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin-bottom:10px;
     display:flex; align-items:center; gap:14px;
   }
-  .lib-card .lc-info{flex:1; min-width:0;}
+  .lib-card .lc-info{flex:1; min-width:0; display:flex; align-items:flex-start; gap:10px;}
   .lib-card .lc-name{font-weight:700; font-size:14.5px; margin-bottom:2px;}
   .lib-card .lc-meta{font-size:12px; color:var(--text-muted);}
   .lib-card .lc-actions{display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;}
   .lib-card .lc-actions .btn{padding:6px 10px; font-size:12px;}
   .lib-card .lc-actions .btn svg{width:13px;height:13px;}
+  .lc-author-badge{
+    flex-shrink:0; width:26px; height:26px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:11px; font-weight:700; color:#fff; margin-top:1px;
+  }
 
   .offline-badge{
     display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:700;
@@ -1068,9 +1078,12 @@
   <div class="lib-modal">
     <div class="lib-head">
       <h3>Le mie schede</h3>
-      <button class="close-x" id="libraryClose" style="position:static;">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
+      <div class="lib-head-actions">
+        <select id="libraryFilterSelect" title="Filtra per editor"></select>
+        <button class="close-x" id="libraryClose" style="position:static;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
     </div>
     <div class="lib-body" id="libraryBody"></div>
   </div>
@@ -4372,6 +4385,24 @@
   }
   function uid(){ return "s" + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 
+  // ---------- Autore scheda: badge + filtro per editor ----------
+  let libraryFilterValue = loadField("raccolta_esercizi_lib_filter", "all");
+  var AUTHOR_BADGE_COLORS = ["#2563eb","#7c3aed","#c2410c","#0891b2","#be185d","#059669","#b45309","#4338ca"];
+  function authorKeyFor(s){ return s.createdByEmail || s.createdByName || "__unknown__"; }
+  function authorLabelFor(s){ return s.createdByName || s.createdByEmail || "Sconosciuto"; }
+  function authorInitials(label){
+    var parts = (label||"").trim().split(/\s+/).filter(Boolean);
+    if(parts.length===0) return "?";
+    if(parts.length===1) return parts[0].slice(0,2).toUpperCase();
+    return (parts[0][0] + parts[parts.length-1][0]).toUpperCase();
+  }
+  function authorColor(key){
+    var hash = 0;
+    for(var i=0;i<key.length;i++){ hash = (hash*31 + key.charCodeAt(i)) | 0; }
+    return AUTHOR_BADGE_COLORS[Math.abs(hash) % AUTHOR_BADGE_COLORS.length];
+  }
+  function currentUserAuthorKey(){ return currentUserEmail || currentEditorName || "__unknown__"; }
+
   function currentSchedaData(){
     return {
       paziente: fPaziente.value || "",
@@ -4426,14 +4457,51 @@
     });
   };
 
+  function renderLibraryFilterOptions(allSchede){
+    var sel = document.getElementById("libraryFilterSelect");
+    var authors = {};
+    allSchede.forEach(function(s){
+      var key = authorKeyFor(s);
+      if(!authors[key]) authors[key] = {key:key, label:authorLabelFor(s), count:0};
+      authors[key].count++;
+    });
+    var authorList = Object.keys(authors).map(function(k){ return authors[k]; }).sort(function(a,b){
+      if(a.key==="__unknown__") return 1;
+      if(b.key==="__unknown__") return -1;
+      return a.label.localeCompare(b.label, "it");
+    });
+    var options = [{key:"all", label:"Tutte le schede"}, {key:"mine", label:"Solo le mie"}].concat(
+      authorList.map(function(a){ return {key:a.key, label:a.label + " (" + a.count + ")"}; })
+    );
+    var prevValue = libraryFilterValue;
+    sel.innerHTML = "";
+    options.forEach(function(o){
+      var opt = document.createElement("option");
+      opt.value = o.key; opt.textContent = o.label;
+      sel.appendChild(opt);
+    });
+    // se l'editor precedentemente selezionato non ha piu' schede, torna a "Tutte"
+    var stillValid = options.some(function(o){ return o.key===prevValue; });
+    libraryFilterValue = stillValid ? prevValue : "all";
+    sel.value = libraryFilterValue;
+  }
+
   function renderLibrary(){
     var body = document.getElementById("libraryBody");
-    var list = loadLibrary();
+    var allSchede = loadLibrary();
+    renderLibraryFilterOptions(allSchede);
+    var list = allSchede.filter(function(s){
+      if(libraryFilterValue==="all") return true;
+      if(libraryFilterValue==="mine") return authorKeyFor(s)===currentUserAuthorKey();
+      return authorKeyFor(s)===libraryFilterValue;
+    });
     body.innerHTML = "";
     if(list.length===0){
       var empty = document.createElement("div");
       empty.className = "lib-empty";
-      empty.textContent = 'Nessuna scheda salvata. Componi una scheda e usa "Salva nella libreria".';
+      empty.textContent = allSchede.length===0
+        ? 'Nessuna scheda salvata. Componi una scheda e usa "Salva nella libreria".'
+        : 'Nessuna scheda per questo filtro.';
       body.appendChild(empty);
       return;
     }
@@ -4443,9 +4511,18 @@
 
       var info = document.createElement("div");
       info.className = "lc-info";
+      var authorLabel = authorLabelFor(s);
+      var badge = document.createElement("div");
+      badge.className = "lc-author-badge";
+      badge.style.background = authorColor(authorKeyFor(s));
+      badge.textContent = authorInitials(authorLabel);
+      badge.title = authorLabel;
+      info.appendChild(badge);
+      var textCol = document.createElement("div");
+      textCol.style.flex = "1"; textCol.style.minWidth = "0";
       var name = document.createElement("div");
       name.className = "lc-name"; name.textContent = s.nome;
-      info.appendChild(name);
+      textCol.appendChild(name);
       var meta = document.createElement("div");
       meta.className = "lc-meta";
       var n = s.sections && s.sections.length
@@ -4457,7 +4534,8 @@
       metaParts.push(n + (n===1 ? " esercizio" : " esercizi"));
       if(s.createdByName) metaParts.push("creata da " + s.createdByName);
       meta.textContent = metaParts.join(" · ");
-      info.appendChild(meta);
+      textCol.appendChild(meta);
+      info.appendChild(textCol);
       card.appendChild(info);
 
       var actions = document.createElement("div");
@@ -4539,6 +4617,11 @@
   document.getElementById("openLibraryBtn").onclick = openLibrary;
   document.getElementById("libraryClose").onclick = closeLibrary;
   document.getElementById("libraryOverlay").addEventListener("click", function(ev){ if(ev.target===this) closeLibrary(); });
+  document.getElementById("libraryFilterSelect").addEventListener("change", function(){
+    libraryFilterValue = this.value;
+    saveField("raccolta_esercizi_lib_filter", libraryFilterValue);
+    renderLibrary();
+  });
 
   // ---------- LETTURA SCHEDA CONDIVISA DA LINK ----------
   // La scheda e' codificata (paziente/data/note/id esercizi) in base64 nel
