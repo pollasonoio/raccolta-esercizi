@@ -2898,6 +2898,11 @@
         var canvas = document.createElement("canvas");
         canvas.width = w; canvas.height = h;
         var ctx = canvas.getContext("2d");
+        // Il JPEG non supporta la trasparenza: senza questo sfondo bianco,
+        // i pixel trasparenti dell'immagine originale (es. PNG con sfondo
+        // trasparente) verrebbero esportati come neri.
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, w, h);
         ctx.drawImage(img, 0, 0, w, h);
         // Le immagini degli esercizi sono in bianco e nero: convertiamo qui
         // in scala di grigi cosi' i nuovi caricamenti sono coerenti con il
