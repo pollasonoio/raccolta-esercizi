@@ -1383,13 +1383,18 @@
   });
 
   function applyTextOverrides(){
+    // Un esercizio assegnato a piu' cartelle compare piu' volte in
+    // CURRENT_EXERCISES (una copia distinta per posizione, vedi
+    // computeEffectiveList): bisogna applicare l'override a TUTTE le copie,
+    // non solo a quella referenziata da byId[id], altrimenti le altre
+    // restano visibili in griglia con il testo pre-modifica.
     var overrides = FIRESTORE_OVERRIDES.textOverrides || {};
-    Object.keys(overrides).forEach(function(id){
-      if(byId[id]){
-        if(typeof overrides[id].nome === "string") byId[id].nome = overrides[id].nome;
-        if(typeof overrides[id].descrizione === "string") byId[id].descrizione = overrides[id].descrizione;
-        if(typeof overrides[id].quantita === "string") byId[id].quantita = overrides[id].quantita;
-      }
+    CURRENT_EXERCISES.forEach(function(e){
+      var o = overrides[e.id];
+      if(!o) return;
+      if(typeof o.nome === "string") e.nome = o.nome;
+      if(typeof o.descrizione === "string") e.descrizione = o.descrizione;
+      if(typeof o.quantita === "string") e.quantita = o.quantita;
     });
   }
 
@@ -1432,7 +1437,7 @@
     entry[field] = value;
     textMap[id] = entry;
     FIRESTORE_OVERRIDES.textOverrides = textMap;
-    byId[id][field] = value;
+    CURRENT_EXERCISES.forEach(function(e){ if(e.id===id) e[field] = value; });
     return saveOverridesToFirestore({textOverrides: textMap});
   }
   function hasOverride(id){
@@ -1446,9 +1451,9 @@
     FIRESTORE_OVERRIDES.textOverrides = textMap;
     var orig = ORIGINALS[id];
     if(orig){
-      byId[id].nome = orig.nome;
-      byId[id].descrizione = orig.descrizione;
-      byId[id].quantita = orig.quantita;
+      CURRENT_EXERCISES.forEach(function(e){
+        if(e.id===id){ e.nome = orig.nome; e.descrizione = orig.descrizione; e.quantita = orig.quantita; }
+      });
     }
     return saveOverridesToFirestore({textOverrides: textMap});
   }
