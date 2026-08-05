@@ -625,11 +625,12 @@
   .account-badge .btn{padding:4px 8px;}
 
   .log-row{
-    display:grid; grid-template-columns:150px 130px 1fr; gap:10px; padding:8px 0;
+    display:grid; grid-template-columns:150px 130px 1fr auto; gap:10px; padding:8px 0;
     border-bottom:1px solid var(--border); font-size:13px; align-items:start;
   }
   .log-when{color:var(--text-muted); font-size:12px;}
   .log-who{font-weight:700; color:var(--accent-dark);}
+  .log-undo-btn{padding:4px 10px; font-size:12px;}
 
   .folder-check-list{
     max-height:280px; overflow-y:auto; border:1px solid var(--border); border-radius:8px; padding:6px 10px;
@@ -1779,17 +1780,19 @@
   document.getElementById("bulkDeleteBtn").onclick = function(){
     var ids = Array.from(state.bulkSelected);
     if(ids.length===0) return;
-    if(!confirm("Eliminare definitivamente " + ids.length + " esercizi selezionati? Saranno rimossi per tutti.")) return;
+    if(!confirm("Eliminare " + ids.length + " esercizi selezionati? Saranno rimossi per tutti (puoi annullarlo dalla Cronologia).")) return;
     var customIds = ids.filter(function(id){ return CUSTOM_EXERCISES.some(function(c){ return c.id === id; }); });
     var baseIds = ids.filter(function(id){ return customIds.indexOf(id) === -1; });
-    var tasks = customIds.map(function(id){ return customExercisesColRef.doc(id).delete(); });
+    var tasks = customIds.length ? [softDeleteCustomExerciseIds(customIds)] : [];
     if(baseIds.length){
       var newDeleted = (FIRESTORE_OVERRIDES.deletedIds || []).slice();
       baseIds.forEach(function(id){ if(newDeleted.indexOf(id)===-1) newDeleted.push(id); });
       tasks.push(saveOverridesToFirestore({deletedIds: newDeleted}));
     }
     Promise.all(tasks).then(function(){
-      logAction("Eliminati esercizi in blocco", ids.length + " esercizi");
+      var undoItems = customIds.map(function(id){ return {id: id, isCustom: true}; })
+        .concat(baseIds.map(function(id){ return {id: id, isCustom: false}; }));
+      logAction("Eliminati esercizi in blocco", ids.length + " esercizi", {type:"bulkDelete", items: undoItems});
       showToast(ids.length + " esercizi eliminati.");
       state.bulkSelected.clear();
       renderGrid();
@@ -1842,6 +1845,16 @@
     if(!confirm("Spostare " + ids.length + " esercizi sotto \"" + [newArea].concat(newPath).join(" / ") + "\"?")) return;
     var customIds = ids.filter(function(id){ return CUSTOM_EXERCISES.some(function(c){ return c.id === id; }); });
     var baseIds = ids.filter(function(id){ return customIds.indexOf(id) === -1; });
+    var beforeItems = ids.map(function(id){
+      var isC = customIds.indexOf(id) !== -1;
+      var previousPrimary = null;
+      if(isC){
+        var rawCustom = CUSTOM_EXERCISES.filter(function(c){ return c.id === id; })[0];
+        if(rawCustom) previousPrimary = {area: rawCustom.area, path: (rawCustom.path||[]).slice()};
+      }
+      var previousFoldersEntry = (FIRESTORE_OVERRIDES.folders||{})[id] ? FIRESTORE_OVERRIDES.folders[id].slice() : null;
+      return {id: id, isCustom: isC, previousPrimary: previousPrimary, previousFoldersEntry: previousFoldersEntry};
+    });
     var tasks = customIds.map(function(id){ return customExercisesColRef.doc(id).update({area: newArea, path: newPath}); });
     if(baseIds.length){
       var foldersMap = {}; for(var k in (FIRESTORE_OVERRIDES.folders||{})) foldersMap[k] = FIRESTORE_OVERRIDES.folders[k];
@@ -1849,7 +1862,7 @@
       tasks.push(saveOverridesToFirestore({folders: foldersMap}));
     }
     Promise.all(tasks).then(function(){
-      logAction("Spostati esercizi in blocco", ids.length + ' esercizi \u2192 "' + [newArea].concat(newPath).join(" / ") + '"');
+      logAction("Spostati esercizi in blocco", ids.length + ' esercizi \u2192 "' + [newArea].concat(newPath).join(" / ") + '"', {type:"bulkFolders", items: beforeItems});
       showToast(ids.length + " esercizi spostati.");
       document.getElementById("bulkMoveOverlay").classList.remove("open");
       state.bulkSelected.clear();
@@ -1893,6 +1906,7 @@
     document.getElementById("modalOverlay").classList.add("open");
   }
   function showModalAt(idx){
+    modalFieldFlushes.forEach(function(f){ f.flush(); });
     if(idx<0) idx = state.modalList.length-1;
     if(idx>=state.modalList.length) idx = 0;
     state.modalIndex = idx;
@@ -2107,11 +2121,16 @@
     btn.style.display = hasOverride(id) ? "inline-flex" : "none";
     btn.onclick = function(){
       if(!confirm("Ripristinare il testo originale per questo esercizio? Le modifiche fatte qui andranno perse.")) return;
+      modalFieldFlushes.forEach(function(f){ f.cancel(); }); // scarta eventuali modifiche non ancora salvate, non le riapplica sopra il ripristino
+      var entry = (FIRESTORE_OVERRIDES.textOverrides||{})[id];
+      var previousOverride = entry ? {nome: entry.nome, descrizione: entry.descrizione, quantita: entry.quantita} : null;
+      var nome = byId[id].nome;
       var savePromise = resetOverride(id);
       showModalAt(state.modalIndex);
       renderGrid();
       savePromise.then(function(){
         flashSaved("Ripristinato il testo originale.");
+        logAction("Ripristinato testo originale", nome, {type:"textOverrideReset", id: id, previousOverride: previousOverride});
       }).catch(function(err){
         alert("Non sono riuscito a salvare il ripristino: " + err.message);
       });
@@ -2126,40 +2145,65 @@
     saveFlashTimer = setTimeout(function(){ el.textContent = ""; }, 2200);
   }
 
-  let editSaveTimer = null;
-  function wireEditableField(inputEl, field){
-    function commit(){
-      clearTimeout(editSaveTimer);
-      var id = state.modalList[state.modalIndex];
-      if(id===undefined) return;
-      if(byId[id][field] === inputEl.value) return; // niente da salvare
-      var savePromise = setOverride(id, field, inputEl.value);
-      refreshResetBtn(id);
-      renderGrid();
-      savePromise.then(function(){
-        flashSaved();
+  // Chiuso su focus/blur invece che su state.modalIndex: cosi' una modifica
+  // rimasta "in sospeso" (debounce non ancora scattato) non viene ne' persa
+  // ne' attribuita all'esercizio sbagliato se nel frattempo si naviga con le
+  // frecce prev/next (showModalAt riscrive .value senza sparare blur).
+  let modalFieldFlushes = [];
+  function wireEditableField(inputEl, field, fieldLabel){
+    var baselineId = null;
+    var baselineValue = null;
+    var pendingTimer = null;
+    function writeAndLog(id, isFinal){
+      if(id===undefined || !byId[id]) return;
+      var changed = byId[id][field] !== inputEl.value;
+      var promise = changed ? setOverride(id, field, inputEl.value) : Promise.resolve();
+      if(changed){ refreshResetBtn(id); renderGrid(); }
+      promise.then(function(){
+        if(changed) flashSaved();
+        if(isFinal && baselineId===id && baselineValue !== inputEl.value){
+          logAction("Modificato " + fieldLabel, byId[id].nome, {type:"textOverride", id: id, field: field, previousValue: baselineValue});
+          baselineValue = inputEl.value;
+        }
       }).catch(function(err){
         alert("Non sono riuscito a salvare la modifica: " + err.message);
       });
     }
-    inputEl.addEventListener("input", function(){
-      clearTimeout(editSaveTimer);
-      editSaveTimer = setTimeout(commit, 400);
+    inputEl.addEventListener("focus", function(){
+      baselineId = state.modalList[state.modalIndex];
+      baselineValue = byId[baselineId] ? byId[baselineId][field] : inputEl.value;
     });
-    inputEl.addEventListener("blur", commit);
+    inputEl.addEventListener("input", function(){
+      clearTimeout(pendingTimer);
+      pendingTimer = setTimeout(function(){ pendingTimer = null; writeAndLog(baselineId, false); }, 400);
+    });
+    inputEl.addEventListener("blur", function(){
+      clearTimeout(pendingTimer); pendingTimer = null;
+      writeAndLog(baselineId, true);
+    });
+    return {
+      flush: function(){
+        if(pendingTimer){ clearTimeout(pendingTimer); pendingTimer = null; writeAndLog(baselineId, true); }
+      },
+      cancel: function(){
+        clearTimeout(pendingTimer); pendingTimer = null;
+      }
+    };
   }
-  wireEditableField(document.getElementById("modalNomeInput"), "nome");
-  wireEditableField(document.getElementById("modalQuantInput"), "quantita");
-  wireEditableField(document.getElementById("modalDescrInput"), "descrizione");
+  modalFieldFlushes.push(wireEditableField(document.getElementById("modalNomeInput"), "nome", "nome esercizio"));
+  modalFieldFlushes.push(wireEditableField(document.getElementById("modalQuantInput"), "quantita", "quantita' esercizio"));
+  modalFieldFlushes.push(wireEditableField(document.getElementById("modalDescrInput"), "descrizione", "descrizione esercizio"));
 
   // ---------- TAG MANUALI (condivisi, solo editor puo' modificarli) ----------
   let tagsSaveTimer = null;
   function saveTagsFor(id, value){
-    var tagsMap = {}; for(var k in (FIRESTORE_OVERRIDES.tags||{})) tagsMap[k] = FIRESTORE_OVERRIDES.tags[k];
     var cleaned = value.trim();
+    var previousValue = (FIRESTORE_OVERRIDES.tags||{})[id] || "";
+    if(cleaned === previousValue) return; // niente da salvare (fixa anche un doppio-log sul blur senza modifiche)
+    var tagsMap = {}; for(var k in (FIRESTORE_OVERRIDES.tags||{})) tagsMap[k] = FIRESTORE_OVERRIDES.tags[k];
     if(cleaned) tagsMap[id] = cleaned; else delete tagsMap[id];
     saveOverridesToFirestore({tags: tagsMap}).then(function(){
-      logAction("Modificati tag", cleaned || "(rimossi)");
+      logAction("Modificati tag", cleaned || "(rimossi)", {type:"tags", id: id, previousValue: previousValue});
       flashSaved("Tag salvati.");
       showToast("Tag salvati.");
     }).catch(function(err){
@@ -2191,6 +2235,7 @@
     };
   }
   function closeModal(){
+    modalFieldFlushes.forEach(function(f){ f.flush(); });
     document.getElementById("modalOverlay").classList.remove("open");
   }
   // Sfugge s per essere inserito sia come testo HTML sia dentro un attributo
@@ -2331,7 +2376,7 @@
   // ---------- CRONOLOGIA MODIFICHE (firmata con nome di chi agisce) ----------
   let currentEditorName = "";
   let currentUserEmail = "";
-  function logAction(action, detail){
+  function logAction(action, detail, undo){
     if(!FIREBASE_ENABLED) return;
     try{
       firebase.firestore().collection("log").add({
@@ -2339,9 +2384,113 @@
         action: action,
         detail: detail || "",
         actorName: currentEditorName || currentUserEmail || "sconosciuto",
-        actorEmail: currentUserEmail || ""
+        actorEmail: currentUserEmail || "",
+        undo: undo || null
       }).catch(function(err){ console.error("Log non salvato:", err); });
     }catch(e){}
+  }
+
+  // ---------- ANNULLA (dalla cronologia) ----------
+  // Ogni tipo di "undo" richiama direttamente le stesse primitive di
+  // scrittura usate altrove (clona-la-mappa-e-salva su overrides/catalog,
+  // oppure update() sul documento dell'esercizio personalizzato), non le
+  // funzioni legate alla UI (che leggono checkbox/input dal DOM). Il
+  // blocco anti-doppio-click e' solo lato client (si riattiva riaprendo
+  // la cronologia): ogni ripristino e' comunque idempotente, quindi un
+  // doppio annullamento accidentale non causa danni.
+  function restoreBaseExerciseIds(ids){
+    var newDeleted = (FIRESTORE_OVERRIDES.deletedIds || []).filter(function(id){ return ids.indexOf(id) === -1; });
+    return saveOverridesToFirestore({deletedIds: newDeleted});
+  }
+  function restoreCustomExerciseIds(ids){
+    return Promise.all(ids.map(function(id){
+      return customExercisesColRef.doc(id).update({
+        deleted: false,
+        deletedAt: firebase.firestore.FieldValue.delete(),
+        deletedBy: firebase.firestore.FieldValue.delete()
+      });
+    }));
+  }
+  function softDeleteCustomExerciseIds(ids){
+    return Promise.all(ids.map(function(id){
+      return customExercisesColRef.doc(id).update({
+        deleted: true,
+        deletedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        deletedBy: currentUserEmail || ""
+      });
+    }));
+  }
+  function restoreTextOverride(id, field, previousValue){
+    return setOverride(id, field, previousValue);
+  }
+  function restoreTextOverrideMap(id, previousOverride){
+    var textMap = {};
+    for(var k in (FIRESTORE_OVERRIDES.textOverrides||{})) textMap[k] = FIRESTORE_OVERRIDES.textOverrides[k];
+    if(previousOverride) textMap[id] = previousOverride; else delete textMap[id];
+    FIRESTORE_OVERRIDES.textOverrides = textMap;
+    return saveOverridesToFirestore({textOverrides: textMap});
+  }
+  function restoreTags(id, previousValue){
+    var tagsMap = {}; for(var k in (FIRESTORE_OVERRIDES.tags||{})) tagsMap[k] = FIRESTORE_OVERRIDES.tags[k];
+    if(previousValue) tagsMap[id] = previousValue; else delete tagsMap[id];
+    return saveOverridesToFirestore({tags: tagsMap});
+  }
+  function restoreFolders(item){
+    var tasks = [];
+    var foldersMap = {}; for(var k in (FIRESTORE_OVERRIDES.folders||{})) foldersMap[k] = FIRESTORE_OVERRIDES.folders[k];
+    if(item.previousFoldersEntry) foldersMap[item.id] = item.previousFoldersEntry; else delete foldersMap[item.id];
+    tasks.push(saveOverridesToFirestore({folders: foldersMap}));
+    if(item.isCustom && item.previousPrimary){
+      tasks.push(customExercisesColRef.doc(item.id).update({area: item.previousPrimary.area, path: item.previousPrimary.path}));
+    }
+    return Promise.all(tasks);
+  }
+  function performUndo(logDocId, undo, originalAction, buttonEl){
+    if(!undo || !undo.type) return;
+    if(buttonEl){ buttonEl.disabled = true; buttonEl.textContent = "..."; }
+    var task;
+    switch(undo.type){
+      case "delete":
+        task = undo.isCustom ? restoreCustomExerciseIds([undo.id]) : restoreBaseExerciseIds([undo.id]);
+        break;
+      case "bulkDelete":
+        var customIds = undo.items.filter(function(it){ return it.isCustom; }).map(function(it){ return it.id; });
+        var baseIds = undo.items.filter(function(it){ return !it.isCustom; }).map(function(it){ return it.id; });
+        task = Promise.all([
+          customIds.length ? restoreCustomExerciseIds(customIds) : Promise.resolve(),
+          baseIds.length ? restoreBaseExerciseIds(baseIds) : Promise.resolve()
+        ]);
+        break;
+      case "createCustom":
+        task = softDeleteCustomExerciseIds([undo.id]);
+        break;
+      case "textOverride":
+        task = restoreTextOverride(undo.id, undo.field, undo.previousValue);
+        break;
+      case "textOverrideReset":
+        task = restoreTextOverrideMap(undo.id, undo.previousOverride);
+        break;
+      case "tags":
+        task = restoreTags(undo.id, undo.previousValue);
+        break;
+      case "folders":
+        task = restoreFolders(undo);
+        break;
+      case "bulkFolders":
+        task = Promise.all(undo.items.map(restoreFolders));
+        break;
+      default:
+        return;
+    }
+    task.then(function(){
+      logAction("Annullata modifica: " + originalAction, "");
+      showToast("Modifica annullata.");
+      renderGrid();
+      renderLog();
+    }).catch(function(err){
+      if(buttonEl){ buttonEl.disabled = false; buttonEl.textContent = "Annulla"; }
+      alert("Non sono riuscito ad annullare: " + err.message);
+    });
   }
   function renderLog(){
     var body = document.getElementById("logBody");
@@ -2359,7 +2508,16 @@
         var when = d.ts && d.ts.toDate ? d.ts.toDate().toLocaleString("it-IT") : "";
         row.innerHTML = '<div class="log-when">'+escapeHtml(when)+'</div>' +
           '<div class="log-who">'+escapeHtml(d.actorName||"")+'</div>' +
-          '<div class="log-what"><b>'+escapeHtml(d.action||"")+'</b>'+(d.detail ? " — "+escapeHtml(d.detail) : "")+'</div>';
+          '<div class="log-what"><b>'+escapeHtml(d.action||"")+'</b>'+(d.detail ? " — "+escapeHtml(d.detail) : "")+'</div>' +
+          '<div class="log-undo"></div>';
+        if(d.undo){
+          var undoBtn = document.createElement("button");
+          undoBtn.type = "button";
+          undoBtn.className = "btn log-undo-btn";
+          undoBtn.textContent = "Annulla";
+          undoBtn.onclick = function(){ performUndo(doc.id, d.undo, d.action, undoBtn); };
+          row.querySelector(".log-undo").appendChild(undoBtn);
+        }
         body.appendChild(row);
       });
     }).catch(function(err){
@@ -2435,6 +2593,7 @@
         var list = [];
         snap.forEach(function(doc){
           var d = doc.data();
+          if(d.deleted) return; // eliminati "soft": restano su Firestore per poterli ripristinare dalla cronologia
           d.id = doc.id;
           list.push(d);
         });
@@ -2515,17 +2674,18 @@
     var id = state.modalList[state.modalIndex];
     var e = byId[id];
     if(!e) return;
-    if(!confirm('Eliminare definitivamente l\'esercizio "' + e.nome + '"? Sara\' rimosso per tutti.')) return;
+    if(!confirm('Eliminare l\'esercizio "' + e.nome + '"? Sara\' rimosso per tutti (puoi annullarlo dalla Cronologia).')) return;
     var isCustom = CUSTOM_EXERCISES.some(function(c){ return c.id === id; });
     var action;
     if(isCustom){
-      action = customExercisesColRef.doc(id).delete();
+      action = softDeleteCustomExerciseIds([id]);
     } else {
       var newDeleted = (FIRESTORE_OVERRIDES.deletedIds || []).slice();
       if(newDeleted.indexOf(id) === -1) newDeleted.push(id);
       action = saveOverridesToFirestore({deletedIds: newDeleted});
     }
     action.then(function(){
+      logAction("Eliminato esercizio", e.nome, {type:"delete", id: id, isCustom: isCustom});
       showToast('Esercizio "' + e.nome + '" eliminato.');
       closeModal();
     }).catch(function(err){
@@ -2600,6 +2760,13 @@
     if(checked.length===0){ errEl.textContent = "Seleziona almeno una cartella (o aggiungine una nuova)."; return; }
 
     var isCustom = CUSTOM_EXERCISES.some(function(c){ return c.id === id; });
+    var nome = byId[id] ? byId[id].nome : "";
+    var previousPrimary = null;
+    if(isCustom){
+      var rawCustom = CUSTOM_EXERCISES.filter(function(c){ return c.id === id; })[0];
+      if(rawCustom) previousPrimary = {area: rawCustom.area, path: (rawCustom.path||[]).slice()};
+    }
+    var previousFoldersEntry = (FIRESTORE_OVERRIDES.folders||{})[id] ? FIRESTORE_OVERRIDES.folders[id].slice() : null;
     var action;
     if(isCustom){
       var updateData = {area: checked[0].area, path: checked[0].path};
@@ -2619,6 +2786,8 @@
       action = saveOverridesToFirestore({folders: foldersMap});
     }
     action.then(function(){
+      var dest = checked.map(function(l){ return [l.area].concat(l.path||[]).join(" / "); }).join(", ");
+      logAction("Spostato esercizio", nome + ' → "' + dest + '"', {type:"folders", id: id, isCustom: isCustom, previousPrimary: previousPrimary, previousFoldersEntry: previousFoldersEntry});
       showToast("Cartelle aggiornate (" + checked.length + (checked.length===1?" cartella":" cartelle") + ").");
       document.getElementById("foldersOverlay").classList.remove("open");
       closeModal();
@@ -2672,10 +2841,15 @@
           dragState.lastRow.classList.remove("drop-target");
           var area = dragState.lastRow.dataset.area;
           var path = JSON.parse(dragState.lastRow.dataset.path || "[]");
-          addExerciseToFolder(dragState.id, area, path).then(function(res){
+          var dragId = dragState.id, dragNome = dragState.nome;
+          var dragIsCustom = CUSTOM_EXERCISES.some(function(c){ return c.id === dragId; });
+          var previousFoldersEntry = (FIRESTORE_OVERRIDES.folders||{})[dragId] ? FIRESTORE_OVERRIDES.folders[dragId].slice() : null;
+          addExerciseToFolder(dragId, area, path).then(function(res){
             if(res !== "already"){
               dragState.lastRow.classList.add("drop-flash");
               setTimeout(function(){ if(dragState && dragState.lastRow) dragState.lastRow.classList.remove("drop-flash"); }, 650);
+              logAction("Spostato esercizio (trascinamento)", dragNome + ' → "' + [area].concat(path).join(" / ") + '"',
+                {type:"folders", id: dragId, isCustom: dragIsCustom, previousPrimary: null, previousFoldersEntry: previousFoldersEntry});
             }
           }).catch(function(err){
             alert("Non sono riuscito ad aggiungere alla cartella: " + err.message);
@@ -2759,6 +2933,7 @@
         descrizione: descr, quantita: quant, img: imgDataUrl || ""
       };
       customExercisesColRef.doc(newId).set(newEx).then(function(){
+        logAction("Nuovo esercizio personalizzato", nome, {type:"createCustom", id: newId});
         showToast('Esercizio "' + nome + '" aggiunto.');
         document.getElementById("addExerciseOverlay").classList.remove("open");
       }).catch(function(err){
