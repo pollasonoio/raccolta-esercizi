@@ -100,6 +100,24 @@
     font-weight:700;
   }
 
+  /* ---------- HEADER RESPONSIVE (tablet, uso reale in studio) ----------
+     Sotto i 1024px l'header non ha più spazio per stare su una riga sola:
+     invece di tagliare i pulsanti fuori dallo schermo, li facciamo andare
+     a capo mantenendo ricerca e "Scheda" (il CTA più usato) tra i primi. */
+  @media (max-width:1024px){
+    header{ flex-wrap:wrap; row-gap:8px; }
+    header h1{ order:1; }
+    .search-wrap{ order:2; flex:1 1 200px; max-width:none; }
+    .header-spacer{ display:none; }
+    #openSchedaBtn{ order:3; }
+    #connBadge{ order:4; }
+    #addExerciseBtn{ order:5; }
+    .tools-menu-wrap.editor-only{ order:6; }
+    #bulkModeBtn{ order:7; }
+    .account-badge{ order:8; }
+    #openLibraryBtn{ order:9; }
+  }
+
   /* ---------- LAYOUT ---------- */
   .layout{flex:1; display:flex; min-height:0;}
   .tree-col{
@@ -292,6 +310,11 @@
     width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px;
     font-size:14.5px; line-height:1.55; color:#334; font-family:inherit; resize:vertical;
     background:var(--accent-pale);
+  }
+  /* Campi bloccati finche' non si preme "Modifica": evita che un tap
+     accidentale durante una seduta modifichi il catalogo condiviso. */
+  .edit-nome[readonly], .edit-quant[readonly], .edit-descr[readonly]{
+    background:var(--bg); color:var(--text-muted); cursor:default;
   }
   .edit-status{font-size:12px; color:var(--accent-dark); min-height:16px; margin-top:6px; font-weight:600;}
   .modal .modal-actions{margin-top:14px; display:flex; gap:10px;}
@@ -486,6 +509,7 @@
   .simple-modal textarea{resize:vertical;}
   .simple-modal .modal-actions{display:flex; gap:10px; justify-content:flex-end; margin-top:18px;}
   .simple-modal .err-text{color:#b42318; font-size:12.5px; min-height:16px; margin-top:8px;}
+  .simple-modal .warn-text{color:#b45309; background:#fffaf0; border:1px solid var(--accent-light); border-radius:8px; font-size:12.5px; margin:12px 0 0; padding:8px 10px;}
   .crop-stage{
     width:100%; aspect-ratio:4/3; background:#eef1f3; border-radius:10px;
     overflow:hidden; position:relative; cursor:grab; touch-action:none; user-select:none;
@@ -968,6 +992,7 @@
 
       <div class="modal-actions">
         <button class="btn primary" id="modalAddBtn"></button>
+        <button class="btn editor-only" id="modalEditFieldsBtn">Modifica</button>
         <button class="btn" id="modalResetBtn" style="display:none;">Ripristina originale</button>
       </div>
       <div class="modal-actions editor-only">
@@ -1143,6 +1168,20 @@
   </div>
 </div>
 
+<!-- SALVA SCHEDA (nome scheda + eventuale conferma sovrascrittura) -->
+<div class="simple-modal-overlay" id="saveSchedaOverlay">
+  <div class="simple-modal">
+    <h3>Salva scheda</h3>
+    <label for="saveSchedaNome">Nome della scheda</label>
+    <input type="text" id="saveSchedaNome">
+    <p class="warn-text" id="saveSchedaWarning" style="display:none;"></p>
+    <div class="modal-actions">
+      <button class="btn" id="saveSchedaCancelBtn">Annulla</button>
+      <button class="btn primary" id="saveSchedaSubmitBtn">Salva</button>
+    </div>
+  </div>
+</div>
+
 <!-- CARTELLE ESERCIZIO (appartenenza multipla) -->
 <div class="simple-modal-overlay" id="foldersOverlay">
   <div class="simple-modal wide">
@@ -1268,6 +1307,13 @@
   state.sections = loadSections();
   if(state.sections.length) state.activeSectionId = state.sections[0].id;
   recomputeSelected();
+
+  // Congela l'ordine "selezionati in cima" al momento in cui si entra in una
+  // vista/ricerca, invece di ricalcolarlo a ogni click sulla stellina: senza
+  // questo, durante una selezione multipla rapida una card puo' "scivolare"
+  // sotto il dito proprio mentre la si sta per toccare di nuovo.
+  let gridOrderSnapshot = new Set(state.selected);
+  function refreshGridOrderSnapshot(){ gridOrderSnapshot = new Set(state.selected); }
 
   function loadSections(){
     try{
@@ -1539,7 +1585,7 @@
     var allRow = document.createElement("div");
     allRow.className = "tree-row" + (state.area===null ? " active":"");
     allRow.innerHTML = '<span class="caret hidden-caret"></span><span class="label">Tutti gli esercizi</span><span class="cnt">'+CURRENT_EXERCISES.length+'</span>';
-    allRow.onclick = function(){ state.area=null; state.path=[]; render(); };
+    allRow.onclick = function(){ state.area=null; state.path=[]; refreshGridOrderSnapshot(); render(); };
     panel.appendChild(allRow);
 
     var rootLabel = document.createElement("div");
@@ -1586,6 +1632,7 @@
     row.onclick = function(ev){
       state.area = area;
       state.path = path;
+      refreshGridOrderSnapshot();
       render();
     };
 
@@ -1631,8 +1678,8 @@
     // subito senza scorrere la lista); dentro ciascun gruppo (selezionati e
     // non), ordine alfabetico per nome invece dell'ordine dei Word.
     list.sort(function(a, b){
-      var as = state.selected.has(a.id) ? 0 : 1;
-      var bs = state.selected.has(b.id) ? 0 : 1;
+      var as = gridOrderSnapshot.has(a.id) ? 0 : 1;
+      var bs = gridOrderSnapshot.has(b.id) ? 0 : 1;
       if(as !== bs) return as - bs;
       return a.nome.localeCompare(b.nome, "it", {sensitivity:"base", numeric:true});
     });
@@ -1926,6 +1973,7 @@
     document.getElementById("modalNomeInput").value = e.nome || "";
     document.getElementById("modalQuantInput").value = e.quantita || "";
     document.getElementById("modalDescrInput").value = e.descrizione || "";
+    lockModalFields();
     var manualTagsEl = document.getElementById("modalManualTags");
     manualTagsEl.innerHTML = "";
     var currentTags = tagsOf(e.id);
@@ -2193,6 +2241,31 @@
   modalFieldFlushes.push(wireEditableField(document.getElementById("modalNomeInput"), "nome", "nome esercizio"));
   modalFieldFlushes.push(wireEditableField(document.getElementById("modalQuantInput"), "quantita", "quantita' esercizio"));
   modalFieldFlushes.push(wireEditableField(document.getElementById("modalDescrInput"), "descrizione", "descrizione esercizio"));
+
+  // Campi nome/quantita/descrizione bloccati finche' non si preme "Modifica":
+  // il catalogo e' condiviso, un tap o un testo incollato per errore durante
+  // una seduta non deve propagarsi subito a tutti gli editor.
+  function lockModalFields(){
+    document.getElementById("modalNomeInput").readOnly = true;
+    document.getElementById("modalQuantInput").readOnly = true;
+    document.getElementById("modalDescrInput").readOnly = true;
+    document.getElementById("modalEditFieldsBtn").textContent = "Modifica";
+  }
+  function unlockModalFields(){
+    document.getElementById("modalNomeInput").readOnly = false;
+    document.getElementById("modalQuantInput").readOnly = false;
+    document.getElementById("modalDescrInput").readOnly = false;
+    document.getElementById("modalEditFieldsBtn").textContent = "Blocca campi";
+  }
+  document.getElementById("modalEditFieldsBtn").onclick = function(){
+    if(document.getElementById("modalNomeInput").readOnly){
+      unlockModalFields();
+      document.getElementById("modalNomeInput").focus();
+    } else {
+      modalFieldFlushes.forEach(function(f){ f.flush(); });
+      lockModalFields();
+    }
+  };
 
   // ---------- TAG MANUALI (condivisi, solo editor puo' modificarli) ----------
   let tagsSaveTimer = null;
@@ -4559,6 +4632,7 @@
     var v = searchInput.value;
     searchTimer = setTimeout(function(){
       state.query = v;
+      refreshGridOrderSnapshot();
       renderGrid();
     }, 120);
   });
@@ -4600,29 +4674,14 @@
     };
   }
 
-  document.getElementById("saveToLibraryBtn").onclick = function(){
-    if(state.selected.size===0){
-      alert("La scheda e' vuota: aggiungi almeno un esercizio prima di salvarla nella libreria.");
-      return;
-    }
-    var cur = currentSchedaData();
-    var pazienteTrim = cur.paziente.trim().toLowerCase();
-    var existing = pazienteTrim ? SCHEDE_CACHE.find(function(s){
-      return (s.paziente || "").trim().toLowerCase() === pazienteTrim;
-    }) : null;
-    var suggestion = existing ? existing.nome : (cur.paziente ? (cur.paziente + " - " + cur.dataVal) : ("Scheda " + cur.dataVal));
-    var nome = prompt("Nome della scheda:", suggestion);
-    if(nome===null) return;
-    nome = nome.trim() || suggestion;
+  var pendingSaveScheda = null; // {cur, existing, suggestion} in attesa di conferma nel modale
+
+  function closeSaveSchedaOverlay(){
+    document.getElementById("saveSchedaOverlay").classList.remove("open");
+  }
+
+  function doSaveScheda(nome, cur, existing){
     var statusEl = document.getElementById("saveStatus");
-    if(existing){
-      var ok = confirm("Esiste gia' una scheda per il paziente \"" + cur.paziente + "\" (\"" + existing.nome + "\"). Sovrascriverla?");
-      if(!ok){
-        statusEl.textContent = "Salvataggio annullato.";
-        setTimeout(function(){ statusEl.textContent=""; }, 3000);
-        return;
-      }
-    }
     statusEl.textContent = "Salvataggio in corso...";
     var docId = existing ? existing.id : uid();
     schedeColRef.doc(docId).set({
@@ -4640,6 +4699,52 @@
       statusEl.textContent = "";
       alert("Non sono riuscito a salvare la scheda: " + err.message);
     });
+  }
+
+  document.getElementById("saveToLibraryBtn").onclick = function(){
+    if(state.selected.size===0){
+      alert("La scheda e' vuota: aggiungi almeno un esercizio prima di salvarla nella libreria.");
+      return;
+    }
+    var cur = currentSchedaData();
+    var pazienteTrim = cur.paziente.trim().toLowerCase();
+    var existing = pazienteTrim ? SCHEDE_CACHE.find(function(s){
+      return (s.paziente || "").trim().toLowerCase() === pazienteTrim;
+    }) : null;
+    var suggestion = existing ? existing.nome : (cur.paziente ? (cur.paziente + " - " + cur.dataVal) : ("Scheda " + cur.dataVal));
+    pendingSaveScheda = {cur: cur, existing: existing, suggestion: suggestion};
+    var warnEl = document.getElementById("saveSchedaWarning");
+    var submitBtn = document.getElementById("saveSchedaSubmitBtn");
+    if(existing){
+      warnEl.textContent = "Esiste gia' una scheda per il paziente \"" + cur.paziente + "\" (\"" + existing.nome + "\"). Salvando sovrascriverai quella scheda.";
+      warnEl.style.display = "block";
+      submitBtn.textContent = "Sovrascrivi";
+    } else {
+      warnEl.style.display = "none";
+      submitBtn.textContent = "Salva";
+    }
+    var nomeInput = document.getElementById("saveSchedaNome");
+    nomeInput.value = suggestion;
+    document.getElementById("saveSchedaOverlay").classList.add("open");
+    nomeInput.focus();
+    nomeInput.select();
+  };
+
+  document.getElementById("saveSchedaCancelBtn").onclick = function(){
+    var statusEl = document.getElementById("saveStatus");
+    statusEl.textContent = "Salvataggio annullato.";
+    setTimeout(function(){ statusEl.textContent=""; }, 3000);
+    pendingSaveScheda = null;
+    closeSaveSchedaOverlay();
+  };
+
+  document.getElementById("saveSchedaSubmitBtn").onclick = function(){
+    if(!pendingSaveScheda) return;
+    var nome = document.getElementById("saveSchedaNome").value.trim() || pendingSaveScheda.suggestion;
+    var cur = pendingSaveScheda.cur, existing = pendingSaveScheda.existing;
+    pendingSaveScheda = null;
+    closeSaveSchedaOverlay();
+    doSaveScheda(nome, cur, existing);
   };
 
   function renderLibraryFilterOptions(allSchede){
