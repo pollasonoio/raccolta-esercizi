@@ -400,7 +400,7 @@
   }
   .sched-section.active{border-color:var(--accent-dark); box-shadow:0 0 0 1px var(--accent-dark);}
   .sched-section-head{
-    display:flex; align-items:center; gap:6px; padding:8px 8px 8px 10px; background:var(--bg);
+    position:relative; display:flex; align-items:center; gap:6px; padding:8px 8px 8px 10px; background:var(--bg);
     cursor:pointer;
   }
   .sched-section-head input.sec-title{
@@ -601,6 +601,29 @@
   .tree-action-menu button.danger{color:#b42318;}
   .tree-action-menu button svg{width:14px; height:14px; flex-shrink:0;}
 
+  /* ---------- POPOVER SCELTA COLORE (palette a pallini + "Altro") ---------- */
+  /* Usato sia dal colore del titolo scheda sia dal colore di ogni sezione:
+     il contenitore che lo apre deve avere position:relative (vedi
+     .title-color-row e .sched-section-head) perche' si posiziona in
+     absolute appena sotto il pulsante che lo ha aperto. */
+  .color-picker-popover{
+    position:absolute; left:0; top:100%; margin-top:4px; z-index:60;
+    background:#fff; border:1px solid var(--border); border-radius:9px;
+    box-shadow:0 8px 22px rgba(0,0,0,.16); padding:8px; display:flex; align-items:center; gap:6px;
+  }
+  .color-picker-popover .cp-swatch{
+    width:22px; height:22px; padding:0; border:2px solid transparent; border-radius:6px; cursor:pointer;
+  }
+  .color-picker-popover .cp-swatch.selected{border-color:var(--text);}
+  .color-picker-popover .cp-other{
+    width:22px; height:22px; padding:0; border:1px solid var(--border); border-radius:6px;
+    cursor:pointer; margin-left:4px; background:none;
+  }
+  .title-color-row{position:relative; display:inline-block;}
+  .title-color-btn{
+    width:26px; height:26px; padding:0; border:1px solid var(--border); border-radius:6px; cursor:pointer;
+  }
+
   .tree-row .label{
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;
   }
@@ -689,17 +712,19 @@
 
 
   /* ---------- CONTENUTO SCHEDA (usato sia nell'anteprima a schermo che in stampa) ---------- */
-  .print-head{border-bottom:2px solid var(--accent); padding-bottom:10px; margin-bottom:16px;}
-  .print-head h1{font-size:19px; margin:0 0 6px; color:var(--accent-dark);}
+  .print-head{border-bottom:2px solid #ddd; padding-bottom:10px; margin-bottom:16px;}
+  .print-head h1{font-size:19px; margin:0 0 6px;}
   .print-meta{font-size:13px; color:#333; display:flex; gap:22px;}
   .print-note{margin-top:8px; font-size:12.5px; color:#333; white-space:pre-line;}
-  .print-section-head{
-    margin:18px 0 8px; padding-top:6px; border-top:1px solid var(--accent-light);
-    break-inside:avoid;
-  }
-  .print-section-head:first-child{margin-top:0; padding-top:0; border-top:none;}
-  .print-section-head h3{margin:0 0 4px; font-size:15px; color:var(--accent-dark);}
-  .print-section-head .section-text{margin:0; font-size:11.5px; color:#555; line-height:1.4;}
+  /* Riquadro di sezione: SOLO il titolo (sfondo pieno nel colore scelto,
+     bordo scuro, testo nero maiuscolo) -- il testo libero della sezione
+     (section-text) sta FUORI, come paragrafo semplice sotto il riquadro,
+     cosi' non eredita il colore/riquadro del titolo. */
+  .print-section-box{margin:14px 0 0; border:1.5px solid #1a1a1a; break-inside:avoid;}
+  .print-section-box:first-child{margin-top:0;}
+  .print-section-box .psb-inner{padding:3px 12px;}
+  .print-section-box h3{margin:0; font-size:15px; font-weight:700; color:#000; text-transform:uppercase; letter-spacing:.02em;}
+  .section-text{margin:6px 0 10px; font-size:11.5px; color:#555; line-height:1.4;}
   .print-item{
     display:flex; gap:14px; padding:8px 0; border-bottom:1px solid #ddd;
     break-inside:avoid;
@@ -710,11 +735,12 @@
   }
   .print-item .pi-thumb img{width:100%; height:100%; object-fit:contain; display:block;}
   .print-item .pi-text{flex:1; min-width:0;}
-  .print-item h4{margin:0 0 4px; font-size:14px;}
+  .print-item h4{margin:0 0 4px; font-size:14px; font-weight:700; color:#000;}
+  .print-item .pi-num{font-weight:700;}
   .print-item .pq{font-size:12px; font-weight:700; color:#000; margin-bottom:3px;}
   .print-item p{margin:0; font-size:12px; color:#333; line-height:1.4;}
-  .print-item .pi-serierep{margin-top:5px; font-size:12px; font-weight:700; color:#7a5c00;}
-  .print-item .pnotes{margin-top:6px; font-size:11.5px; color:#888; border-top:1px dashed #ccc; padding-top:4px;}
+  .print-item .pi-serierep{margin-top:5px; font-size:12px; font-weight:700; color:#000;}
+  .print-item .pnotes{margin-top:6px; font-size:11.5px; font-style:italic; color:#000; border-top:1px dashed #ccc; padding-top:4px;}
   .a4-page-number{
     text-align:center; font-size:10.5px; color:#888; margin-top:0.3cm; flex-shrink:0;
   }
@@ -1044,6 +1070,13 @@
         <div>
           <label>Data</label>
           <input id="fData" type="text" placeholder="gg/mm/aaaa">
+        </div>
+        <div>
+          <label>Colore titolo scheda</label>
+          <div class="title-color-row">
+            <button type="button" class="title-color-btn" id="fTitleColorBtn"></button>
+            <input type="hidden" id="fTitleColor" value="#7a5c00">
+          </div>
         </div>
         <div class="note-field-wrap">
           <label>Note</label>
@@ -3842,14 +3875,20 @@
       titleInput.onclick = function(ev){ ev.stopPropagation(); };
       titleInput.oninput = function(){ sec.title = titleInput.value; saveSections(); };
       head.appendChild(titleInput);
-      var colorInput = document.createElement("input");
-      colorInput.type = "color";
-      colorInput.className = "sec-color";
-      colorInput.title = "Colore del titolo nella scheda stampata";
-      colorInput.value = sec.color || "#7a5c00";
-      colorInput.onclick = function(ev){ ev.stopPropagation(); };
-      colorInput.oninput = function(){ sec.color = colorInput.value; saveSections(); };
-      head.appendChild(colorInput);
+      var colorBtn = document.createElement("button");
+      colorBtn.type = "button";
+      colorBtn.className = "sec-color";
+      colorBtn.title = "Colore della sezione nella scheda stampata";
+      colorBtn.style.background = sec.color || "#7a5c00";
+      colorBtn.onclick = function(ev){
+        ev.stopPropagation();
+        openColorPickerPopover(head, sec.color || "#7a5c00", function(hex){
+          sec.color = hex;
+          colorBtn.style.background = hex;
+          saveSections();
+        });
+      };
+      head.appendChild(colorBtn);
       var colsSelect = document.createElement("select");
       colsSelect.className = "sec-columns";
       colsSelect.title = "Colonne nella scheda stampata";
@@ -3998,12 +4037,24 @@
   // campi paziente/data/note persistenti
   let fPaziente = document.getElementById("fPaziente");
   let fData = document.getElementById("fData");
+  let fTitleColor = document.getElementById("fTitleColor");
+  let fTitleColorBtn = document.getElementById("fTitleColorBtn");
   let fNote = document.getElementById("fNote"); // contenteditable: contenuto = HTML (grassetto/corsivo/sottolineato)
   fPaziente.value = loadField("raccolta_esercizi_paziente", "");
   // la data si aggiorna sempre a oggi all'apertura dell'app (non resta
   // "congelata" all'ultima modifica salvata) -- resta comunque modificabile
   fData.value = new Date().toLocaleDateString("it-IT");
   saveField("raccolta_esercizi_data", fData.value);
+  fTitleColor.value = loadField("raccolta_esercizi_titleColor", "#7a5c00");
+  fTitleColorBtn.style.background = fTitleColor.value;
+  fTitleColorBtn.onclick = function(ev){
+    ev.stopPropagation();
+    openColorPickerPopover(fTitleColorBtn.parentElement, fTitleColor.value, function(hex){
+      fTitleColor.value = hex;
+      fTitleColorBtn.style.background = hex;
+      saveField("raccolta_esercizi_titleColor", hex);
+    });
+  };
   fNote.innerHTML = loadField("raccolta_esercizi_note", "");
   fPaziente.oninput = function(){ saveField("raccolta_esercizi_paziente", fPaziente.value); };
   fData.oninput = function(){ saveField("raccolta_esercizi_data", fData.value); };
@@ -4044,6 +4095,58 @@
   let LH_HEADER_RATIO = 0.0959;
   let LH_FOOTER_RATIO = 0.0690;
 
+  // ---------- PALETTE COLORI (titolo scheda + intestazioni di sezione) ----------
+  // 6 colori scelti dalla clinica (satura attenuata ~30% rispetto agli
+  // originali sgargianti, luminosita' riaggiustata quel poco che serve per
+  // restare leggibili come sfondo pieno con testo nero sopra). Sia il titolo
+  // "Scheda esercizi" sia ogni sezione scelgono un colore da qui (scorciatoia
+  // a pallini) oppure "Altro" per un colore libero qualsiasi.
+  var SECTION_PALETTE = [
+    {name:"Verde",        hex:"#26a636"},
+    {name:"Amber Gold",   hex:"#daad2f"},
+    {name:"Blaze Orange", hex:"#d6632b"},
+    {name:"Neon Pink",    hex:"#d92874"},
+    {name:"Blue Violet",  hex:"#8c5ad3"},
+    {name:"Azure Blue",   hex:"#578de1"}
+  ];
+
+  let openColorPickerEl = null;
+  function closeColorPickerPopover(){
+    if(openColorPickerEl){ openColorPickerEl.remove(); openColorPickerEl = null; }
+  }
+  document.addEventListener("click", closeColorPickerPopover);
+
+  // Popover con le 6 swatch di SECTION_PALETTE + un selettore colore libero
+  // ("Altro"), riusato sia per il colore del titolo scheda sia per il colore
+  // di ogni sezione. containerEl e' l'elemento (position:relative) dentro
+  // cui appendere il popover -- si posiziona da solo appena sotto, via CSS.
+  function openColorPickerPopover(containerEl, currentColor, onPick){
+    if(openColorPickerEl){ closeColorPickerPopover(); return; }
+    var pop = document.createElement("div");
+    pop.className = "color-picker-popover";
+    pop.onclick = function(ev){ ev.stopPropagation(); };
+    var current = (currentColor || "").toLowerCase();
+    SECTION_PALETTE.forEach(function(c){
+      var sw = document.createElement("button");
+      sw.type = "button";
+      sw.className = "cp-swatch" + (c.hex.toLowerCase() === current ? " selected" : "");
+      sw.style.background = c.hex;
+      sw.title = c.name;
+      sw.onclick = function(){ closeColorPickerPopover(); onPick(c.hex); };
+      pop.appendChild(sw);
+    });
+    var other = document.createElement("input");
+    other.type = "color";
+    other.className = "cp-other";
+    other.title = "Altro colore";
+    other.value = /^#[0-9a-fA-F]{6}$/.test(currentColor || "") ? currentColor : "#7a5c00";
+    other.onclick = function(ev){ ev.stopPropagation(); };
+    other.oninput = function(){ onPick(other.value); };
+    pop.appendChild(other);
+    containerEl.appendChild(pop);
+    openColorPickerEl = pop;
+  }
+
   let _cmPx = null;
   function cmToPx(cm){
     // 1cm = 37.795275591px a 96dpi e' un valore FISSO, garantito dalla
@@ -4056,10 +4159,18 @@
     return cm * _cmPx;
   }
 
-  function buildItemHtml(imgSrc, nome, quantita, descrizione, serieRep, note){
-    return '<div class="print-item">' +
+  function buildItemHtml(imgSrc, nome, quantita, descrizione, serieRep, note, numero, sectionColor, suppressBorder){
+    // numero/sectionColor (opzionali): mostrano davanti al nome la posizione
+    // dell'esercizio nell'ordine di inserimento nella sezione (riparte da 1
+    // a ogni sezione), colorata come la sezione. suppressBorder toglie la
+    // sottile linea grigia sotto l'ULTIMA riga della sezione: tra le righe
+    // di esercizi ci vuole, verso la sezione successiva no (ci pensa gia' il
+    // riquadro colorato a separarle).
+    var borderAttr = suppressBorder ? ' style="border-bottom:none;"' : '';
+    var numPrefix = numero ? ('<span class="pi-num" style="color:'+sectionColor+'">'+numero+'.</span>') : '';
+    return '<div class="print-item"' + borderAttr + '>' +
       '<div class="pi-thumb">' + (imgSrc ? '<img src="'+escapeHtml(imgSrc)+'" alt="">' : "") + '</div>' +
-      '<div class="pi-text"><h4>'+escapeHtml(nome)+'</h4>' +
+      '<div class="pi-text"><h4>'+numPrefix+escapeHtml(nome)+'</h4>' +
       (quantita ? '<div class="pq">'+escapeHtml(quantita)+'</div>' : "") +
       '<p>'+escapeHtml(descrizione || "")+'</p>' +
       (serieRep ? '<div class="pi-serierep">'+escapeHtml(serieRep)+'</div>' : "") +
@@ -4078,24 +4189,30 @@
     return html;
   }
 
-  function buildTitleHtml(paziente, dataVal, note){
+  function buildTitleHtml(paziente, dataVal, note, titleColor){
     // "note" arriva dal campo Note generale (contenteditable con B/I/U): e'
     // gia' HTML formattato dall'editor, va inserito cosi' com'e' (non va
     // ri-scappato come testo semplice, altrimenti si vedrebbero i tag).
-    return '<div class="print-head"><h1>Scheda esercizi</h1><div class="print-meta">' +
+    var color = titleColor || '#7a5c00';
+    return '<div class="print-head"><h1 style="color:'+color+'">Scheda esercizi</h1><div class="print-meta">' +
       (paziente ? '<span>Paziente: '+escapeHtml(paziente)+'</span>' : '') +
       '<span>Data: '+escapeHtml(dataVal)+'</span></div>' +
       (note ? '<div class="print-note">'+note+'</div>' : '') +
       '</div>';
   }
 
-  function buildSectionHeaderHtml(title, text, color){
-    if(!title && !text) return "";
-    var titleStyle = color ? (' style="color:'+color+'"') : "";
-    return '<div class="print-section-head">' +
-      (title ? '<h3'+titleStyle+'>'+escapeHtml(title)+'</h3>' : '') +
-      (text ? '<p class="section-text">'+escapeHtml(text).replace(/\n/g,'<br>')+'</p>' : '') +
-      '</div>';
+  // Riquadro di sezione: SOLO il titolo, sfondo pieno nel colore della
+  // sezione. Il testo libero (sec.text) e' un blocco a parte (vedi
+  // buildSectionTextHtml sotto) apposta per non ereditare il riquadro.
+  function buildSectionBoxHtml(title, color){
+    if(!title) return "";
+    return '<div class="print-section-box" style="background:'+color+'"><div class="psb-inner">' +
+      '<h3>'+escapeHtml(title)+'</h3>' +
+      '</div></div>';
+  }
+  function buildSectionTextHtml(text){
+    if(!text) return "";
+    return '<p class="section-text">'+escapeHtml(text).replace(/\n/g,'<br>')+'</p>';
   }
 
   // ---------- IMPAGINAZIONE A4 ----------
@@ -4144,10 +4261,23 @@
   function flattenSectionsToBlocks(sections){
     var blocks = [];
     (sections||[]).forEach(function(sec, secIdx){
-      var headHtml = buildSectionHeaderHtml(sec.title, sec.text, sec.color);
-      if(headHtml) blocks.push({html: headHtml, isHeader: true, sectionIndex: secIdx});
-      var itemHtmls = (sec.items||[]).map(function(it){
-        return buildItemHtml(it.imgSrc, it.nome, it.quantita, it.descrizione, it.serieRep, it.note);
+      var color = sec.color || '#7a5c00';
+      var boxHtml = buildSectionBoxHtml(sec.title, color);
+      if(boxHtml) blocks.push({html: boxHtml, isHeader: true, sectionIndex: secIdx});
+      var textHtml = buildSectionTextHtml(sec.text);
+      if(textHtml) blocks.push({html: textHtml, isHeader: true, sectionIndex: secIdx});
+      var items = sec.items || [];
+      // L'ultima RIGA (singolo esercizio a 1 colonna, o coppia a 2 colonne)
+      // non porta la sottile linea grigia sotto -- vedi buildItemHtml.
+      var itemHtmls = items.map(function(it, i){
+        var isLastRow;
+        if(sec.columns === 1){
+          isLastRow = (i === items.length - 1);
+        } else {
+          var pairStart = items.length - (items.length % 2 === 0 ? 2 : 1);
+          isLastRow = (i >= pairStart);
+        }
+        return buildItemHtml(it.imgSrc, it.nome, it.quantita, it.descrizione, it.serieRep, it.note, i+1, color, isLastRow);
       });
       if(sec.columns === 1){
         itemHtmls.forEach(function(h){ blocks.push({html: h, isHeader: false, sectionIndex: secIdx}); });
@@ -4312,12 +4442,12 @@
   // se il contenuto non entra in uno, se ne genera un altro identico, cosi'
   // la scheda resta sempre in formato A4 a prescindere da quanto contiene.
   // sections = [{title, text, items:[{imgSrc,nome,quantita,descrizione},...]}, ...]
-  function buildA4Sheets(container, headerSrc, footerSrc, paziente, dataVal, note, sections, signatureLines){
+  function buildA4Sheets(container, headerSrc, footerSrc, paziente, dataVal, note, sections, signatureLines, titleColor){
     container.innerHTML = "";
 
     var geo = computeA4Geometry(headerSrc, footerSrc, signatureLines);
     var blocks = flattenSectionsToBlocks(sections);
-    var titleHtml = buildTitleHtml(paziente, dataVal, note);
+    var titleHtml = buildTitleHtml(paziente, dataVal, note, titleColor);
     var measured = measureBlocks(titleHtml, blocks, geo.contentWPx);
 
     console.log("[DIAGNOSTICA SCHEDA] sezioni ricevute:", (sections||[]).length,
@@ -4359,7 +4489,7 @@
     buildA4Sheets(
       document.getElementById("printPages"), tpl.headerUrl, tpl.footerUrl,
       fPaziente.value, fData.value || new Date().toLocaleDateString("it-IT"),
-      fNote.innerHTML, currentItemsForPrint(), sig.lines
+      fNote.innerHTML, currentItemsForPrint(), sig.lines, fTitleColor.value
     );
     document.title = schedaFilename(fPaziente.value).replace(/\.html$/, "");
 
@@ -4432,7 +4562,7 @@
     buildA4Sheets(
       document.getElementById("previewPages"), tpl.headerUrl, tpl.footerUrl,
       fPaziente.value, fData.value || new Date().toLocaleDateString("it-IT"),
-      fNote.innerHTML, currentItemsForPrint(), sig.lines
+      fNote.innerHTML, currentItemsForPrint(), sig.lines, fTitleColor.value
     );
   }
 
@@ -4529,6 +4659,7 @@
     var paziente = (override && override.paziente !== undefined) ? override.paziente : (fPaziente.value || "");
     var dataVal = (override && override.dataVal) ? override.dataVal : (fData.value || new Date().toLocaleDateString("it-IT"));
     var note = (override && override.note !== undefined) ? override.note : (fNote.innerHTML || "");
+    var titleColor = (override && override.titleColor) ? override.titleColor : (fTitleColor.value || "#7a5c00");
     var srcSections = (override && override.sections) ? override.sections : state.sections;
 
     var haveImgData = await ensureImgDataLoaded();
@@ -4554,7 +4685,7 @@
     var title = "Scheda esercizi" + (paziente ? " - " + paziente : "") + " - " + dataVal;
     var dataJson = JSON.stringify({
       headerSrc: headerSrc, footerSrc: footerSrc, signatureLines: signatureLines,
-      paziente: paziente, dataVal: dataVal, note: note, sections: sections
+      paziente: paziente, dataVal: dataVal, note: note, sections: sections, titleColor: titleColor
     });
 
     return '<!DOCTYPE html>\n<html lang="it"><head><meta charset="UTF-8"><title>' + escapeHtml(title) + '</title>' +
@@ -4567,23 +4698,25 @@
       '.a4-sheet .a4-body{flex:1 1 auto;overflow:hidden;}' +
       '.a4-columns{display:flex;gap:0.8cm;align-items:flex-start;}' +
       '.a4-col{flex:1 1 0;min-width:0;}' +
-      '.print-head{border-bottom:2px solid #F5C400;padding-bottom:10px;margin-bottom:16px;}' +
-      '.print-head h1{font-size:19px;margin:0 0 6px;color:#7a5c00;}' +
+      '.print-head{border-bottom:2px solid #ddd;padding-bottom:10px;margin-bottom:16px;}' +
+      '.print-head h1{font-size:19px;margin:0 0 6px;}' +
       '.print-meta{font-size:13px;color:#333;display:flex;gap:22px;}' +
       '.print-note{margin-top:8px;font-size:12.5px;color:#333;white-space:pre-line;}' +
-      '.print-section-head{margin:18px 0 8px;padding-top:6px;border-top:1px solid #fff3c4;break-inside:avoid;}' +
-      '.print-section-head:first-child{margin-top:0;padding-top:0;border-top:none;}' +
-      '.print-section-head h3{margin:0 0 4px;font-size:15px;color:#7a5c00;}' +
-      '.print-section-head .section-text{margin:0;font-size:11.5px;color:#555;line-height:1.4;}' +
+      '.print-section-box{margin:14px 0 0;border:1.5px solid #1a1a1a;break-inside:avoid;}' +
+      '.print-section-box:first-child{margin-top:0;}' +
+      '.print-section-box .psb-inner{padding:3px 12px;}' +
+      '.print-section-box h3{margin:0;font-size:15px;font-weight:700;color:#000;text-transform:uppercase;letter-spacing:.02em;}' +
+      '.section-text{margin:6px 0 10px;font-size:11.5px;color:#555;line-height:1.4;}' +
       '.print-item{display:flex;gap:14px;padding:8px 0;border-bottom:1px solid #ddd;break-inside:avoid;}' +
       '.print-item .pi-thumb{width:120px;height:120px;flex:0 0 120px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:6px;}' +
       '.print-item .pi-thumb img{width:100%;height:100%;object-fit:contain;display:block;}' +
       '.print-item .pi-text{flex:1;min-width:0;}' +
-      '.print-item h4{margin:0 0 4px;font-size:14px;}' +
+      '.print-item h4{margin:0 0 4px;font-size:14px;font-weight:700;color:#000;}' +
+      '.print-item .pi-num{font-weight:700;}' +
       '.print-item .pq{font-size:12px;font-weight:700;color:#000;margin-bottom:3px;}' +
       '.print-item p{margin:0;font-size:12px;color:#333;line-height:1.4;}' +
-      '.print-item .pi-serierep{margin-top:5px;font-size:12px;font-weight:700;color:#7a5c00;}' +
-      '.print-item .pnotes{margin-top:6px;font-size:11.5px;color:#888;border-top:1px dashed #ccc;padding-top:4px;}' +
+      '.print-item .pi-serierep{margin-top:5px;font-size:12px;font-weight:700;color:#000;}' +
+      '.print-item .pnotes{margin-top:6px;font-size:11.5px;font-style:italic;color:#000;border-top:1px dashed #ccc;padding-top:4px;}' +
       '.a4-page-number{text-align:center;font-size:10.5px;color:#888;margin-top:0.3cm;flex-shrink:0;}' +
       '.a4-signature-wrap{margin-top:0.6cm;padding-top:0.4cm;border-top:1px solid #ddd;display:flex;justify-content:flex-end;}' +
       '.a4-signature-text{font-family:Georgia,"Times New Roman",serif;text-align:right;line-height:1.35;}' +
@@ -4613,7 +4746,8 @@
       buildItemHtml.toString() + ';' +
       pairItemsHtml.toString() + ';' +
       buildTitleHtml.toString() + ';' +
-      buildSectionHeaderHtml.toString() + ';' +
+      buildSectionBoxHtml.toString() + ';' +
+      buildSectionTextHtml.toString() + ';' +
       signatureLinesHtml.toString() + ';' +
       computeA4Geometry.toString() + ';' +
       flattenSectionsToBlocks.toString() + ';' +
@@ -4622,7 +4756,7 @@
       packPagesWithSignature.toString() + ';' +
       renderA4Pages.toString() + ';' +
       buildA4Sheets.toString() + ';' +
-      'buildA4Sheets(document.getElementById("pages"), D.headerSrc, D.footerSrc, D.paziente, D.dataVal, D.note, D.sections, D.signatureLines);' +
+      'buildA4Sheets(document.getElementById("pages"), D.headerSrc, D.footerSrc, D.paziente, D.dataVal, D.note, D.sections, D.signatureLines, D.titleColor);' +
       '<\/script>' +
       '</body></html>';
   }
@@ -4684,6 +4818,7 @@
       paziente: fPaziente.value || "",
       dataVal: fData.value || new Date().toLocaleDateString("it-IT"),
       note: fNote.innerHTML || "",
+      titleColor: fTitleColor.value || "#7a5c00",
       ids: Array.from(state.selected),
       sections: JSON.parse(JSON.stringify(state.sections)),
       templateId: fTemplate.value || "__default__",
@@ -4703,7 +4838,7 @@
     var docId = existing ? existing.id : uid();
     schedeColRef.doc(docId).set({
       nome: nome, paziente: cur.paziente, dataVal: cur.dataVal,
-      note: cur.note, ids: cur.ids, sections: cur.sections, templateId: cur.templateId, signatureId: cur.signatureId,
+      note: cur.note, titleColor: cur.titleColor, ids: cur.ids, sections: cur.sections, templateId: cur.templateId, signatureId: cur.signatureId,
       createdAt: existing ? (existing.createdAt || Date.now()) : Date.now(),
       updatedAt: Date.now(),
       createdByName: existing ? (existing.createdByName || currentEditorName || currentUserEmail || "sconosciuto") : (currentEditorName || currentUserEmail || "sconosciuto"),
@@ -4857,9 +4992,12 @@
         fData.value = new Date().toLocaleDateString("it-IT");
         fNote.innerHTML = s.note || "";
         updateNoteToolbarState();
+        fTitleColor.value = s.titleColor || "#7a5c00";
+        fTitleColorBtn.style.background = fTitleColor.value;
         saveField("raccolta_esercizi_paziente", fPaziente.value);
         saveField("raccolta_esercizi_data", fData.value);
         saveField("raccolta_esercizi_note", fNote.innerHTML);
+        saveField("raccolta_esercizi_titleColor", fTitleColor.value);
         populateTemplateSelect(s.templateId || "__default__");
         saveField("raccolta_esercizi_template", fTemplate.value);
         populateSignatureSelect(s.signatureId || "__none__");
