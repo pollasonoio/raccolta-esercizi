@@ -839,6 +839,13 @@
     body{display:block !important;}
     #printPages{display:block !important;}
 
+    /* Senza questo, i browser tolgono di default gli sfondi (e in alcuni
+       casi anche altri colori non-testuali) in stampa per risparmiare
+       inchiostro: il riquadro colorato di sezione e i numeri colorati
+       degli esercizi sparirebbero, lasciando colorato solo il titolo
+       "Scheda esercizi" (che e' un color del testo, non uno sfondo). */
+    *{-webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; color-adjust:exact !important;}
+
     #printPages .a4-sheet{
       box-shadow:none; margin:0; break-after:page; page-break-after:always;
     }
@@ -4724,6 +4731,7 @@
       '@page{size:A4;margin:0;}' +
       '@media print{' +
         'body{background:#fff;padding:0;}' +
+        '*{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important;}' +
         '#pages{display:block;}' +
         '.a4-sheet{box-shadow:none;margin:0;break-after:page;page-break-after:always;}' +
         '.a4-sheet:last-child{break-after:auto;page-break-after:auto;}' +
