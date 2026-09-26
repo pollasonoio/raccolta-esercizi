@@ -452,10 +452,20 @@
     display:flex; align-items:center; justify-content:space-between; flex-shrink:0;
   }
   .lib-head h3{margin:0; font-size:17px;}
-  .lib-head-actions{display:flex; align-items:center; gap:10px;}
+  .lib-head-actions{display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end;}
   .lib-head-actions select{
     padding:6px 8px; border:1px solid var(--border); border-radius:8px;
     font-size:12.5px; font-family:inherit; background:var(--bg); color:var(--text);
+  }
+  .lib-search-wrap{position:relative;}
+  .lib-search-wrap input{
+    width:170px; padding:6px 8px 6px 28px; border:1px solid var(--border); border-radius:8px;
+    font-size:12.5px; font-family:inherit; background:var(--bg); color:var(--text);
+  }
+  .lib-search-wrap input:focus{outline:2px solid var(--accent); outline-offset:-1px; background:#fff;}
+  .lib-search-wrap svg{
+    position:absolute; left:8px; top:50%; transform:translateY(-50%);
+    width:13px; height:13px; color:var(--text-muted);
   }
   .lib-body{padding:14px 22px 22px; overflow-y:auto;}
   .lib-empty{color:var(--text-muted); font-size:13.5px; text-align:center; padding:50px 10px;}
@@ -1145,6 +1155,14 @@
     <div class="lib-head">
       <h3>Le mie schede</h3>
       <div class="lib-head-actions">
+        <div class="lib-search-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input id="librarySearchInput" type="text" placeholder="Cerca per nome o paziente...">
+        </div>
+        <select id="librarySortSelect" title="Ordina">
+          <option value="recenti">Più recenti</option>
+          <option value="nome">Nome (A-Z)</option>
+        </select>
         <select id="libraryFilterSelect" title="Filtra per editor"></select>
         <button class="close-x" id="libraryClose" style="position:static;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -4806,6 +4824,8 @@
 
   // ---------- Autore scheda: badge + filtro per editor ----------
   let libraryFilterValue = loadField("raccolta_esercizi_lib_filter", "all");
+  let librarySortValue = loadField("raccolta_esercizi_lib_sort", "recenti");
+  let librarySearchValue = "";
   var AUTHOR_BADGE_COLORS = ["#2563eb","#7c3aed","#c2410c","#0891b2","#be185d","#059669","#b45309","#4338ca"];
   function authorKeyFor(s){ return s.createdByEmail || s.createdByName || "__unknown__"; }
   function authorLabelFor(s){ return s.createdByName || s.createdByEmail || "Sconosciuto"; }
@@ -4956,10 +4976,18 @@
     var body = document.getElementById("libraryBody");
     var allSchede = loadLibrary();
     renderLibraryFilterOptions(allSchede);
+    var query = librarySearchValue.trim().toLowerCase();
     var list = allSchede.filter(function(s){
-      if(libraryFilterValue==="all") return true;
-      if(libraryFilterValue==="mine") return authorKeyFor(s)===currentUserAuthorKey();
-      return authorKeyFor(s)===libraryFilterValue;
+      if(libraryFilterValue==="all"){ /* nessun filtro autore */ }
+      else if(libraryFilterValue==="mine"){ if(authorKeyFor(s)!==currentUserAuthorKey()) return false; }
+      else if(authorKeyFor(s)!==libraryFilterValue) return false;
+      if(!query) return true;
+      var haystack = ((s.nome||"") + " " + (s.paziente||"")).toLowerCase();
+      return haystack.indexOf(query) !== -1;
+    });
+    list.sort(function(a,b){
+      if(librarySortValue==="nome") return (a.nome||"").localeCompare(b.nome||"", "it");
+      return (b.createdAt||0) - (a.createdAt||0);
     });
     body.innerHTML = "";
     if(list.length===0){
@@ -4978,11 +5006,17 @@
       var info = document.createElement("div");
       info.className = "lc-info";
       var authorLabel = authorLabelFor(s);
+      var isMine = authorKeyFor(s) === currentUserAuthorKey();
       var badge = document.createElement("div");
       badge.className = "lc-author-badge";
-      badge.style.background = authorColor(authorKeyFor(s));
+      if(isMine){
+        badge.style.background = "var(--accent)";
+        badge.style.color = "var(--accent-dark)";
+      } else {
+        badge.style.background = authorColor(authorKeyFor(s));
+      }
       badge.textContent = authorInitials(authorLabel);
-      badge.title = authorLabel;
+      badge.title = authorLabel + (isMine ? " (tu)" : "");
       info.appendChild(badge);
       var textCol = document.createElement("div");
       textCol.style.flex = "1"; textCol.style.minWidth = "0";
@@ -5081,7 +5115,13 @@
     });
   }
 
-  function openLibrary(){ renderLibrary(); document.getElementById("libraryOverlay").classList.add("open"); }
+  function openLibrary(){
+    librarySearchValue = "";
+    document.getElementById("librarySearchInput").value = "";
+    document.getElementById("librarySortSelect").value = librarySortValue;
+    renderLibrary();
+    document.getElementById("libraryOverlay").classList.add("open");
+  }
   function closeLibrary(){ document.getElementById("libraryOverlay").classList.remove("open"); }
   document.getElementById("openLibraryBtn").onclick = openLibrary;
   document.getElementById("libraryClose").onclick = closeLibrary;
@@ -5090,6 +5130,20 @@
     libraryFilterValue = this.value;
     saveField("raccolta_esercizi_lib_filter", libraryFilterValue);
     renderLibrary();
+  });
+  document.getElementById("librarySortSelect").addEventListener("change", function(){
+    librarySortValue = this.value;
+    saveField("raccolta_esercizi_lib_sort", librarySortValue);
+    renderLibrary();
+  });
+  var librarySearchTimer = null;
+  document.getElementById("librarySearchInput").addEventListener("input", function(){
+    var v = this.value;
+    clearTimeout(librarySearchTimer);
+    librarySearchTimer = setTimeout(function(){
+      librarySearchValue = v;
+      renderLibrary();
+    }, 120);
   });
 
   // ---------- LETTURA SCHEDA CONDIVISA DA LINK ----------
