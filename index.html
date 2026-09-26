@@ -1208,18 +1208,17 @@
   </div>
 </div>
 
-<!-- SALVA SCHEDA (nome scheda + scelta nuova/sovrascrivi) -->
+<!-- SALVA SCHEDA (nome scheda + salva nuovo/sovrascrivi) -->
 <div class="simple-modal-overlay" id="saveSchedaOverlay">
   <div class="simple-modal">
     <h3>Salva scheda</h3>
-    <label for="saveSchedaTarget">Salva come</label>
-    <select id="saveSchedaTarget"></select>
-    <label for="saveSchedaNome" style="margin-top:10px;">Nome della scheda</label>
+    <label for="saveSchedaNome">Nome della scheda</label>
     <input type="text" id="saveSchedaNome">
     <p class="warn-text" id="saveSchedaWarning" style="display:none;"></p>
     <div class="modal-actions">
       <button class="btn" id="saveSchedaCancelBtn">Annulla</button>
-      <button class="btn primary" id="saveSchedaSubmitBtn">Salva</button>
+      <button class="btn" id="saveSchedaNewBtn">Salva nuovo</button>
+      <button class="btn primary" id="saveSchedaOverwriteBtn">Sovrascrivi</button>
     </div>
   </div>
 </div>
@@ -4867,27 +4866,6 @@
     return cur.paziente ? (cur.paziente + " - " + cur.dataVal) : ("Scheda " + cur.dataVal);
   }
 
-  function applySaveSchedaTargetChoice(){
-    if(!pendingSaveScheda) return;
-    var sel = document.getElementById("saveSchedaTarget");
-    var warnEl = document.getElementById("saveSchedaWarning");
-    var submitBtn = document.getElementById("saveSchedaSubmitBtn");
-    var nomeInput = document.getElementById("saveSchedaNome");
-    var cur = pendingSaveScheda.cur;
-    var existing = sel.value === "__new__" ? null : SCHEDE_CACHE.find(function(s){ return s.id === sel.value; });
-    pendingSaveScheda.existing = existing;
-    if(existing){
-      warnEl.textContent = "Salvando sovrascriverai la scheda \"" + existing.nome + "\" (i dati attuali di quella scheda andranno persi).";
-      warnEl.style.display = "block";
-      submitBtn.textContent = "Sovrascrivi";
-      nomeInput.value = existing.nome;
-    } else {
-      warnEl.style.display = "none";
-      submitBtn.textContent = "Salva";
-      nomeInput.value = newSchedaSuggestion(cur);
-    }
-  }
-
   document.getElementById("saveToLibraryBtn").onclick = function(){
     if(state.selected.size===0){
       alert("La scheda e' vuota: aggiungi almeno un esercizio prima di salvarla nella libreria.");
@@ -4895,33 +4873,26 @@
     }
     var cur = currentSchedaData();
     var pazienteTrim = cur.paziente.trim().toLowerCase();
-    var autoMatch = pazienteTrim ? SCHEDE_CACHE.find(function(s){
+    var existing = pazienteTrim ? SCHEDE_CACHE.find(function(s){
       return (s.paziente || "").trim().toLowerCase() === pazienteTrim;
     }) : null;
-    pendingSaveScheda = {cur: cur, existing: null, suggestion: newSchedaSuggestion(cur)};
+    var suggestion = existing ? existing.nome : newSchedaSuggestion(cur);
+    pendingSaveScheda = {cur: cur, existing: existing, suggestion: suggestion};
 
-    var sel = document.getElementById("saveSchedaTarget");
-    sel.innerHTML = "";
-    var newOpt = document.createElement("option");
-    newOpt.value = "__new__"; newOpt.textContent = "Nuova scheda";
-    sel.appendChild(newOpt);
-    var sortedSchede = SCHEDE_CACHE.slice().sort(function(a,b){
-      return (b.updatedAt||0) - (a.updatedAt||0);
-    });
-    sortedSchede.forEach(function(s){
-      var opt = document.createElement("option");
-      opt.value = s.id;
-      var label = "Sovrascrivi: " + s.nome;
-      if(s.paziente) label += " (" + s.paziente + ")";
-      opt.textContent = label;
-      sel.appendChild(opt);
-    });
-    sel.value = autoMatch ? autoMatch.id : "__new__";
-    sel.onchange = applySaveSchedaTargetChoice;
-    applySaveSchedaTargetChoice();
+    var warnEl = document.getElementById("saveSchedaWarning");
+    var overwriteBtn = document.getElementById("saveSchedaOverwriteBtn");
+    if(existing){
+      warnEl.textContent = "Esiste gia' una scheda per il paziente \"" + cur.paziente + "\" (\"" + existing.nome + "\"). \"Sovrascrivi\" la aggiorna, \"Salva nuovo\" ne crea una in piu'.";
+      warnEl.style.display = "block";
+      overwriteBtn.style.display = "";
+    } else {
+      warnEl.style.display = "none";
+      overwriteBtn.style.display = "none";
+    }
 
-    document.getElementById("saveSchedaOverlay").classList.add("open");
     var nomeInput = document.getElementById("saveSchedaNome");
+    nomeInput.value = suggestion;
+    document.getElementById("saveSchedaOverlay").classList.add("open");
     nomeInput.focus();
     nomeInput.select();
   };
@@ -4934,8 +4905,17 @@
     closeSaveSchedaOverlay();
   };
 
-  document.getElementById("saveSchedaSubmitBtn").onclick = function(){
+  document.getElementById("saveSchedaNewBtn").onclick = function(){
     if(!pendingSaveScheda) return;
+    var nome = document.getElementById("saveSchedaNome").value.trim() || newSchedaSuggestion(pendingSaveScheda.cur);
+    var cur = pendingSaveScheda.cur;
+    pendingSaveScheda = null;
+    closeSaveSchedaOverlay();
+    doSaveScheda(nome, cur, null);
+  };
+
+  document.getElementById("saveSchedaOverwriteBtn").onclick = function(){
+    if(!pendingSaveScheda || !pendingSaveScheda.existing) return;
     var nome = document.getElementById("saveSchedaNome").value.trim() || pendingSaveScheda.suggestion;
     var cur = pendingSaveScheda.cur, existing = pendingSaveScheda.existing;
     pendingSaveScheda = null;
