@@ -843,6 +843,7 @@
   .preview-toolbar{
     flex-shrink:0; background:var(--accent-dark); color:#fff; padding:12px 22px;
     display:flex; align-items:center; justify-content:space-between; gap:14px;
+    flex-wrap:wrap;
   }
   .preview-toolbar-title{font-weight:700; font-size:15px;}
   .preview-toolbar-actions{display:flex; gap:10px;}
@@ -4624,8 +4625,9 @@
       alert("La scheda e' vuota: aggiungi almeno un esercizio prima dell'anteprima.");
       return;
     }
-    buildPreview();
     document.getElementById("previewOverlay").classList.add("open");
+    buildPreview();
+    fitPreviewSheets();
   };
   document.getElementById("previewCloseBtn").onclick = function(){
     document.getElementById("previewOverlay").classList.remove("open");
@@ -4644,6 +4646,34 @@
       fNote.innerHTML, currentItemsForPrint(), sig.lines, fTitleColor.value
     );
   }
+
+  // I fogli .a4-sheet sono larghi 20.6cm (~780px), pensati per la stampa:
+  // su un telefono non ci starebbero mai, quindi in anteprima li si
+  // rimpicciolisce con un transform:scale calcolato sulla larghezza
+  // disponibile (mai ingranditi oltre 1, cosi' su desktop/tablet non cambia
+  // nulla). L'altezza del contenitore va corretta a mano perche' un
+  // transform non libera lo spazio che occuperebbe senza scala.
+  function fitPreviewSheets(){
+    var pagesEl = document.getElementById("previewPages");
+    var scrollEl = document.querySelector(".preview-scroll");
+    if(!pagesEl || !scrollEl) return;
+    pagesEl.style.transform = "";
+    pagesEl.style.transformOrigin = "";
+    pagesEl.style.height = "";
+    var naturalWidth = pagesEl.scrollWidth;
+    var naturalHeight = pagesEl.scrollHeight;
+    if(!naturalWidth) return;
+    var available = scrollEl.clientWidth - 32; // margine dal padding orizzontale di .preview-scroll
+    var scale = Math.min(1, available / naturalWidth);
+    if(scale < 1){
+      pagesEl.style.transformOrigin = "top center";
+      pagesEl.style.transform = "scale(" + scale + ")";
+      pagesEl.style.height = (naturalHeight * scale) + "px";
+    }
+  }
+  window.addEventListener("resize", function(){
+    if(document.getElementById("previewOverlay").classList.contains("open")) fitPreviewSheets();
+  });
 
   // ---------- SALVA SCHEDA ----------
   // Genera un file HTML autonomo della scheda corrente (carta intestata +
