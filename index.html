@@ -422,6 +422,14 @@
   .drawer-item .di-move:hover{background:var(--accent-light); color:var(--accent-dark);}
   .drawer-item .di-move:disabled{opacity:.25; cursor:default;}
   .drawer-item .di-move:disabled:hover{background:transparent; color:var(--text-muted);}
+  .drawer-item .di-move.on{background:var(--accent-light); color:var(--accent-dark);}
+  .drawer-item .di-move-to{display:flex; flex-wrap:wrap; gap:6px; align-items:center; padding:2px 0 4px;}
+  .drawer-item .di-move-to span{font-size:11px; color:var(--text-muted);}
+  .drawer-item .di-move-to button{
+    border:1px solid var(--border); background:var(--panel); border-radius:999px; padding:4px 10px;
+    font-size:12px; font-family:inherit; cursor:pointer;
+  }
+  .drawer-item .di-move-to button:hover{border-color:var(--accent); background:var(--accent-light);}
   .drawer-empty{color:var(--text-muted); font-size:13px; text-align:center; padding:30px 10px;}
 
   /* ---------- SEZIONI DELLA SCHEDA ---------- */
@@ -3928,6 +3936,29 @@
   document.getElementById("drawerClose").onclick = closeDrawer;
   document.getElementById("drawerOverlay").onclick = closeDrawer;
 
+  // Sposta un esercizio da una sezione all'altra della scheda, portandosi
+  // dietro nota e serie/ripetizioni (salvate per sezione). atStart=true lo
+  // mette in cima alla sezione di destinazione, altrimenti in fondo.
+  function moveExerciseToSection(id, fromSec, toSec, atStart){
+    if(!fromSec || !toSec || fromSec === toSec) return;
+    fromSec.exerciseIds = fromSec.exerciseIds.filter(function(x){ return x !== id; });
+    if(!toSec.exerciseIds) toSec.exerciseIds = [];
+    if(atStart) toSec.exerciseIds.unshift(id); else toSec.exerciseIds.push(id);
+    if(fromSec.itemNotes && fromSec.itemNotes[id] !== undefined){
+      if(!toSec.itemNotes) toSec.itemNotes = {};
+      toSec.itemNotes[id] = fromSec.itemNotes[id];
+      delete fromSec.itemNotes[id];
+    }
+    if(fromSec.itemSerieRep && fromSec.itemSerieRep[id] !== undefined){
+      if(!toSec.itemSerieRep) toSec.itemSerieRep = {};
+      toSec.itemSerieRep[id] = fromSec.itemSerieRep[id];
+      delete fromSec.itemSerieRep[id];
+    }
+  }
+
+  // esercizio (id) di cui e' aperta la riga "Sposta in:" nel pannello scheda
+  let moveToOpenId = null;
+
   function renderDrawer(){
     var list = document.getElementById("drawerList");
     list.innerHTML = "";
@@ -3938,7 +3969,9 @@
       list.appendChild(empty);
       return;
     }
-    state.sections.forEach(function(sec){
+    state.sections.forEach(function(sec, secIdx){
+      var prevSec = state.sections[secIdx-1] || null;
+      var nextSec = state.sections[secIdx+1] || null;
       var box = document.createElement("div");
       box.className = "sched-section" + (sec.id === state.activeSectionId ? " active" : "");
 
@@ -4026,27 +4059,50 @@
           name.className = "di-name"; name.textContent = e.nome;
           topRow.appendChild(name);
           var upBtn = document.createElement("button");
-          upBtn.className = "di-move"; upBtn.title = "Sposta su";
-          upBtn.disabled = idx === 0;
+          upBtn.className = "di-move";
+          upBtn.title = (idx === 0 && prevSec) ? ('Sposta in fondo alla sezione "' + (prevSec.title||"senza nome") + '"') : "Sposta su";
+          upBtn.disabled = idx === 0 && !prevSec;
           upBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>';
           upBtn.onclick = function(){
-            if(idx === 0) return;
+            if(idx === 0){
+              if(!prevSec) return;
+              moveExerciseToSection(id, sec, prevSec, false);
+              saveSections(); renderDrawer();
+              return;
+            }
             var arr = sec.exerciseIds;
             var tmp = arr[idx-1]; arr[idx-1] = arr[idx]; arr[idx] = tmp;
             saveSections(); renderDrawer();
           };
           topRow.appendChild(upBtn);
           var downBtn = document.createElement("button");
-          downBtn.className = "di-move"; downBtn.title = "Sposta giu'";
-          downBtn.disabled = idx === sec.exerciseIds.length - 1;
+          var isLast = idx === sec.exerciseIds.length - 1;
+          downBtn.className = "di-move";
+          downBtn.title = (isLast && nextSec) ? ('Sposta in cima alla sezione "' + (nextSec.title||"senza nome") + '"') : "Sposta giu'";
+          downBtn.disabled = isLast && !nextSec;
           downBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>';
           downBtn.onclick = function(){
-            if(idx === sec.exerciseIds.length - 1) return;
+            if(isLast){
+              if(!nextSec) return;
+              moveExerciseToSection(id, sec, nextSec, true);
+              saveSections(); renderDrawer();
+              return;
+            }
             var arr = sec.exerciseIds;
             var tmp = arr[idx+1]; arr[idx+1] = arr[idx]; arr[idx] = tmp;
             saveSections(); renderDrawer();
           };
           topRow.appendChild(downBtn);
+          var moveToBtn = document.createElement("button");
+          moveToBtn.className = "di-move" + (moveToOpenId === id ? " on" : "");
+          moveToBtn.title = "Sposta in un'altra sezione";
+          moveToBtn.disabled = state.sections.length < 2;
+          moveToBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>';
+          moveToBtn.onclick = function(){
+            moveToOpenId = (moveToOpenId === id) ? null : id;
+            renderDrawer();
+          };
+          topRow.appendChild(moveToBtn);
           var rm = document.createElement("button");
           rm.className = "di-remove";
           rm.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
@@ -4058,6 +4114,26 @@
           };
           topRow.appendChild(rm);
           row.appendChild(topRow);
+          if(moveToOpenId === id && state.sections.length > 1){
+            var moveTo = document.createElement("div");
+            moveTo.className = "di-move-to";
+            var lbl = document.createElement("span");
+            lbl.textContent = "Sposta in:";
+            moveTo.appendChild(lbl);
+            state.sections.forEach(function(target){
+              if(target === sec) return;
+              var b = document.createElement("button");
+              b.type = "button";
+              b.textContent = target.title || "senza nome";
+              b.onclick = function(){
+                moveExerciseToSection(id, sec, target, false);
+                moveToOpenId = null;
+                saveSections(); renderDrawer();
+              };
+              moveTo.appendChild(b);
+            });
+            row.appendChild(moveTo);
+          }
           var serieRepInput = document.createElement("input");
           serieRepInput.type = "text";
           serieRepInput.className = "di-serie-rep";
